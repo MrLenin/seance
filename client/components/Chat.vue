@@ -50,6 +50,17 @@
 						:network="network"
 						:channel="channel"
 					/>
+					<span
+						v-if="network.status.connecting"
+						class="connecting-tooltip tooltipped tooltipped-w tooltipped-no-touch"
+						:data-tooltip="connectingLabel"
+					>
+						<span
+							class="connecting-indicator"
+							role="status"
+							:aria-label="connectingLabel"
+						/>
+					</span>
 					<button
 						class="mentions"
 						aria-label="Open your mentions"
@@ -132,6 +143,7 @@ import ListExcepts from "./Special/ListExcepts.vue";
 import ListChannels from "./Special/ListChannels.vue";
 import ListIgnored from "./Special/ListIgnored.vue";
 import {defineComponent, PropType, ref, computed, watch, nextTick, onMounted, Component} from "vue";
+import {channelOpened} from "../js/helpers/lastChannel";
 import type {ClientNetwork, ClientChan} from "../js/types";
 import {useStore} from "../js/store";
 import {SpecialChanType, ChanType} from "../../shared/types/chan";
@@ -169,6 +181,10 @@ export default defineComponent({
 			return toPlainText(layout(topic, {markdown: store.state.settings.markdown}));
 		});
 
+		const connectingLabel = computed(() =>
+			props.network.name ? `Connecting to ${props.network.name}…` : "Connecting…"
+		);
+
 		const specialComponent = computed(() => {
 			switch (props.channel.special) {
 				case SpecialChanType.BANLIST:
@@ -191,6 +207,11 @@ export default defineComponent({
 			emit("channel-changed", props.channel);
 
 			socket.emit("open", props.channel.id);
+
+			// Where the user is, for the next page load to come back to
+			// (helpers/lastChannel.ts); the lobby and special windows do
+			// not count, and this calls off a restore the user got ahead of.
+			channelOpened(props.network.uuid, props.channel.name, props.channel.type);
 
 			if (props.channel.usersOutdated) {
 				props.channel.usersOutdated = false;
@@ -274,6 +295,7 @@ export default defineComponent({
 			messageList,
 			topicInput,
 			plainTopic,
+			connectingLabel,
 			specialComponent,
 			hideUserVisibleError,
 			editTopic,

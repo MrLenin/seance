@@ -65,6 +65,11 @@ export async function boot(): Promise<void> {
 
 	store.commit("serverConfiguration", configuration);
 
+	// Before the settings store's first write (which would drop the old key):
+	// the removed global "Enable browser notifications" checkbox, when it was
+	// off, stamps notifyEnabled: false onto every saved network.
+	saved.migrateGlobalNotify();
+
 	// 'theme' setting depends on serverConfiguration.themes so
 	// settings cannot be applied before this point
 	void store.dispatch("settings/applyAll");

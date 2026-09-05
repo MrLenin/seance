@@ -26,8 +26,9 @@ import {useRoute} from "vue-router";
 import {navigate} from "../../js/router";
 import socket from "../../js/socket";
 import {useStore} from "../../js/store";
-import type {SavedNetwork} from "../../js/irc/saved-networks";
 import * as saved from "../../js/irc/saved-networks";
+import type {SavedNetwork} from "../../js/irc/saved-networks";
+import webpush from "../../js/webpush";
 import NetworkForm, {ConnectionAction, NetworkFormDefaults} from "../NetworkForm.vue";
 
 /**
@@ -95,7 +96,11 @@ export default defineComponent({
 
 		const handleSubmit = (data: SavedNetwork) => {
 			disabled.value = true;
+			// Read before the emit: `network:edit` saves synchronously, and the
+			// push side needs the previous flag to react to a change.
+			const pushWas = saved.pushEnabledOf(saved.get(data.uuid));
 			socket.emit("network:edit", data);
+			webpush.onNetworkSaved(data, pushWas);
 			void navigate("Networks");
 			disabled.value = false;
 		};
@@ -108,7 +113,9 @@ export default defineComponent({
 			}
 
 			if (action === "connect") {
+				const pushWas = saved.pushEnabledOf(saved.get(data.uuid));
 				socket.emit("network:edit", data);
+				webpush.onNetworkSaved(data, pushWas);
 			}
 
 			socket.emit("input", {

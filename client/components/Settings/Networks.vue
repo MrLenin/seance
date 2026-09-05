@@ -148,6 +148,7 @@ import type {SavedNetwork} from "../../js/irc/saved-networks";
 import {switchToChannel} from "../../js/router";
 import socket from "../../js/socket";
 import {useStore} from "../../js/store";
+import webpush from "../../js/webpush";
 
 export default defineComponent({
 	name: "NetworkSettings",
@@ -211,11 +212,12 @@ export default defineComponent({
 					text: "This removes the saved network and disconnects it if it is running.",
 					button: "Delete network",
 				},
-				(confirmed: boolean) => {
+				async (confirmed: boolean) => {
 					if (!confirmed) {
 						return;
 					}
 
+					await webpush.unsubscribe(network.uuid);
 					saved.remove(network.uuid);
 					const current = live(network.uuid);
 
