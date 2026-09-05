@@ -34,12 +34,15 @@ self-signed.
 ## Wire watching
 
 With no scenario the tool opens the URL, logs everything, and exits after
-`--stay` ms. Note `autoconnect=1`: without it the query parameters only
-pre-fill the connect form and no socket is ever opened.
+`--stay` ms. Query parameters only **pre-fill** the connect form — a URL can
+no longer auto-connect (`docs/projects/irc-link-new-server-dialog.md`) — so to
+watch a live connection either click Connect yourself (`--headful`), run
+`tools/scenarios/link-approval.mjs`, or reuse a `--profile` whose saved
+networks already match the link, which connects without the form.
 
 ```sh
-node tools/browser-drive.mjs --stay=60000 --max-frame=80 \
-  --url='http://localhost:8000/?host=localhost&port=8443&tls=true&nick=probe&join=%23seance&autoconnect=1'
+node tools/browser-drive.mjs --headful --stay=60000 --max-frame=80 \
+  --url='http://localhost:8000/?host=localhost&port=8443&tls=true&nick=probe&join=%23seance'
 ```
 
 ```

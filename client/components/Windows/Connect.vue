@@ -6,6 +6,10 @@
 		<form class="container" method="post" action="" @submit.prevent="onSubmit">
 			<h1 class="title">{{ t("connect.title") }}</h1>
 
+			<div v-if="linkNotice" class="connect-notice connect-link-notice">
+				{{ linkNotice }}
+			</div>
+
 			<h2 v-if="showSavedNetworks">{{ t("connect.savedNetworks") }}</h2>
 			<div
 				v-if="showSavedNetworks && savedNetworks.length === 0"
@@ -280,6 +284,11 @@
 #connect .connect-network .input-wrap {
 	padding: 6px 0;
 }
+
+#connect .connect-link-notice {
+	background-color: #fcf8e3;
+	color: #8a6d3b;
+}
 </style>
 
 <script lang="ts">
@@ -290,23 +299,19 @@ import {brandingFeatures, brandingString, expandNick} from "../../js/branding";
 import {autoconnectSavedNetworks, createNetwork} from "../../js/irc/manager";
 import * as saved from "../../js/irc/saved-networks";
 import {defaultPort, displayName, SavedNetwork} from "../../js/irc/saved-networks";
+import {mergeJoinLists} from "../../js/helpers/linkTarget";
 import type {ConnectOptions} from "../../js/irc/types";
 import RevealPassword from "../RevealPassword.vue";
 import SidebarToggle from "../SidebarToggle.vue";
 
 export type {ConnectOptions};
 
-/** URL parameters that pre-fill the form (and so beat the last-used entry). */
-const CONNECT_PARAMS = [
-	"host",
-	"port",
-	"tls",
-	"nick",
-	"join",
-	"channels",
-	"saslAccount",
-	"saslPassword",
-];
+/**
+ * URL parameters that pre-fill the form (and so beat the last-used entry).
+ * `saslPassword` is deliberately not accepted: a link must not carry secrets
+ * (docs/projects/irc-link-new-server-dialog.md).
+ */
+const CONNECT_PARAMS = ["host", "port", "tls", "nick", "join", "channels", "saslAccount"];
 
 export default defineComponent({
 	name: "Connect",
@@ -393,7 +398,29 @@ export default defineComponent({
 			(key) => props.queryParams && props.queryParams[key] !== undefined
 		);
 
-		if (hasConnectParams) {
+		// boot.ts routes here when a web+irc:// link (or a ?host= URL) names a
+		// server that is not approved yet (`fromLink`), was refused by a locked
+		// deploy (`linkIgnored`), or matches a saved network that still needs
+		// its password typed (`savedLink`). See docs/resources/irc-links.md.
+		const savedLinkUuid = firstParam(props.queryParams?.savedLink);
+		const savedLink = savedLinkUuid ? saved.get(savedLinkUuid) : undefined;
+		const linkIgnored = firstParam(props.queryParams?.linkIgnored);
+		const fromLink = isTruthyParam(props.queryParams?.fromLink);
+		let focusPassword = false;
+
+		if (savedLink) {
+			prefill(savedLink);
+			const linkJoin = firstParam(props.queryParams?.join);
+
+			if (linkJoin) {
+				form.join = mergeJoinLists(form.join, linkJoin);
+			}
+
+			if (savedLink.sasl === "plain" && !savedLink.saslPassword) {
+				notice.value = `Enter the password for ${savedLink.saslAccount} to connect.`;
+				focusPassword = true;
+			}
+		} else if (hasConnectParams) {
 			applyQueryParams(form, props.queryParams);
 			pinServer();
 			showSasl.value = form.sasl === "plain" || !!form.saslAccount;
@@ -412,6 +439,15 @@ export default defineComponent({
 				showSasl.value = form.sasl === "plain" || !!form.saslAccount;
 			}
 		}
+
+		// What the link asked for, said out loud — the approval step's context.
+		const linkNotice = linkIgnored
+			? `This app only connects to ${networkLabel}. The link to ${linkIgnored} was ignored.`
+			: fromLink && !savedLink && form.host
+			? `This link suggests connecting to ${form.host}:${form.port}` +
+			  (form.join ? ` and joining ${form.join}` : "") +
+			  ". Nothing is saved until you choose to connect."
+			: "";
 
 		// Follow the TLS checkbox while the port is still one of the defaults.
 		watch(
@@ -480,9 +516,10 @@ export default defineComponent({
 		};
 
 		onMounted(() => {
-			// `?autoconnect=1` with a host and nick skips the form entirely.
-			if (isTruthyParam(props.queryParams?.autoconnect) && form.host && form.nick) {
-				onSubmit();
+			// A link to a saved network whose password was not remembered:
+			// everything is filled in but the password, so put the cursor there.
+			if (focusPassword) {
+				passwordInput.value?.focus();
 			}
 
 			// Saved networks flagged autoconnect (once per page load).
@@ -503,6 +540,7 @@ export default defineComponent({
 			savedNetworks,
 			submitted,
 			notice,
+			linkNotice,
 			passwordInput,
 			displayName,
 			prefill,
@@ -533,21 +571,12 @@ function applyQueryParams(form: ConnectOptions, params?: Record<string, any>) {
 		return;
 	}
 
-	const first = (value: unknown): string | undefined => {
-		if (Array.isArray(value)) {
-			value = value[0];
-		}
-
-		return value === undefined || value === null ? undefined : String(value);
-	};
-
-	const host = first(params.host);
-	const port = first(params.port);
-	const tls = first(params.tls);
-	const nick = first(params.nick);
-	const join = first(params.join ?? params.channels);
-	const saslAccount = first(params.saslAccount);
-	const saslPassword = first(params.saslPassword);
+	const host = firstParam(params.host);
+	const port = firstParam(params.port);
+	const tls = firstParam(params.tls);
+	const nick = firstParam(params.nick);
+	const join = firstParam(params.join ?? params.channels);
+	const saslAccount = firstParam(params.saslAccount);
 
 	if (host) {
 		form.host = host;
@@ -578,9 +607,14 @@ function applyQueryParams(form: ConnectOptions, params?: Record<string, any>) {
 		form.saslAccount = saslAccount;
 		form.sasl = "plain";
 	}
+}
 
-	if (saslPassword) {
-		form.saslPassword = saslPassword;
+/** First value of a possibly-repeated query parameter, as a string. */
+function firstParam(value: unknown): string | undefined {
+	if (Array.isArray(value)) {
+		value = value[0];
 	}
+
+	return value === undefined || value === null ? undefined : String(value);
 }
 </script>

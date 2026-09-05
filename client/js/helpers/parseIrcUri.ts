@@ -48,6 +48,15 @@ export default (stringUri: string) => {
 		channel += uri.hash;
 	}
 
+	// Channels travel URL-encoded (`%23chan%20key` -> `#chan key`): a `#`
+	// only survives un-encoded in the fragment, and a join key needs the
+	// space a URL cannot carry raw.
+	try {
+		channel = decodeURIComponent(channel);
+	} catch (e) {
+		// a stray % is not worth refusing the whole link for
+	}
+
 	return {
 		name: uri.hostname,
 		host: uri.hostname,

@@ -34,8 +34,9 @@ Ship `NODE_ENV=production corepack yarn build`.
   makes Chrome focus the running window for any later launch (taskbar/app
   icon, `web+irc://` link, `?uri=` URL) and hand the URL to
   `window.launchQueue`. `pwa.ts` feeds that into the same `handleQueryParams`
-  path `boot.ts` uses for a fresh open, so a `web+irc://host/#chan` link opens
-  the connect form pre-filled **without reloading** and dropping live IRC
+  path `boot.ts` uses for a fresh open, so a `web+irc://host/#chan` link joins
+  the channel on an already-approved (saved) network — or opens the connect
+  form pre-filled for approval — **without reloading** and dropping live IRC
   connections. Without this, every launch was a reload.
 - **`web+irc:` links.** `protocol_handlers` in the manifest registers the app
   for the scheme at install time (Chrome asks once, on first use). The

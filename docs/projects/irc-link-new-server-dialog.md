@@ -1,6 +1,6 @@
 # `web+irc://` links to an unknown server should open an "add server" dialog
 
-_Noted 2026-08-27. Status: idea, not started. Related: `docs/resources/pwa.md`
+_Noted 2026-08-27. Status: **implemented 2026-09-05** (see Outcome). Related: `docs/resources/pwa.md`
 and `docs/resources/irc-links.md` (installed app receives `web+irc:` links via
 `protocol_handlers` → `?uri=`; since 2026-08-28 the scheme is `web+irc:`, not
 `irc:`/`ircs:`, and a link's port is a WebSocket port)._
@@ -53,3 +53,29 @@ saved, connect to (or focus) that network and join the channel.
   persisted until confirmed; locked deploy → ignored with a message; tests for
   the matcher and for `parseIrcUri` edge cases (no port, legacy `irc:`/`ircs:`,
   channel with key, multiple channels).
+
+## Outcome (2026-09-05)
+
+Implemented as designed, with the `Connect` window in a "suggested by link"
+mode rather than a separate modal:
+
+- `client/js/helpers/linkTarget.ts` — `linkSuggestion()` reads the
+  query-parameter object and never reads `saslPassword` or `autoconnect`;
+  `decideLinkTarget()` matches casefolded host + port + TLS against
+  `saved-networks.list()` and honours the locked-deploy policy; plus
+  `mergeJoinLists()` / `sanitizeLinkParams()`. Vue-free; tests in
+  `test/helpers/linkTarget.ts`.
+- `client/js/boot.ts` `handleQueryParams()` applies the decision: saved →
+  `openSavedTarget()` reuses the live client or reconnects, `/join`s the
+  linked channels (the server's confirmation focuses them) and focuses one
+  already open; a saved network that still needs its SASL password typed goes
+  to the form instead (`savedLink=<uuid>`); unknown → the connect form with
+  `fromLink=1` and a banner; locked deploy + foreign host → the form with
+  `linkIgnored=<host>` and none of the link's fields applied.
+- `client/components/Windows/Connect.vue` — the banner, the `savedLink`
+  pre-fill (password field focused), `saslPassword` dropped from
+  `CONNECT_PARAMS`, and the `?autoconnect=1` auto-submit removed: connecting
+  to a server that is not saved always takes a click.
+- `client/js/helpers/parseIrcUri.ts` percent-decodes the channel part, so
+  `web+irc://host/%23chan%20key` can carry a join key.
+- Browser check: `tools/scenarios/link-approval.mjs`.

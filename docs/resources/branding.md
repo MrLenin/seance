@@ -80,7 +80,7 @@ Every field is optional; `{"appName": "Seance"}` (the shipped default) is a comp
 | `uploads.withCredentials`              | boolean                 | `false`                            | Send cookies with the request (`credentials: "include"`).                                                                                                           |
 | `uploads.headers`                      | object of strings       | none                               | Extra request headers, e.g. `{"X-Api-Key": "…"}`. `Content-Type` is ignored: the browser sets the multipart boundary.                                               |
 
-URL parameters (`?host=…&port=…&nick=…&join=…&autoconnect=1`, `?uri=web+irc://…`) still pre-fill the form and beat `defaultNetwork`, except for host/port/TLS when the host is locked.
+URL parameters (`?host=…&port=…&nick=…&join=…`, `?uri=web+irc://…`) still pre-fill the form and beat `defaultNetwork`, except for host/port/TLS when the host is locked; a locked deploy answers a link to any other host with a \"link was ignored\" notice instead of applying it. A URL can no longer supply `saslPassword` or `autoconnect`: connecting to a server that is not already saved always takes a click, while a link matching a saved network connects to it directly (see `docs/projects/irc-link-new-server-dialog.md`).
 
 ## Failed SASL logins
 
