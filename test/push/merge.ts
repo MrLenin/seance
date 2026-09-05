@@ -128,6 +128,37 @@ describe("push/merge", function () {
 			expect(c.entries).to.deep.equal(b.entries);
 		});
 
+		it("takes the batch msgid from whichever line carries it (first line only, may arrive late)", function () {
+			// draft/multiline's fallback form: msgid on the first line only.
+			const late = addMessage([], {
+				from: "x",
+				text: "two",
+				batch: "b1",
+				line: {index: 2, sent: 2, total: 2},
+			});
+			expect(late.entries[0].msgid).to.equal(undefined);
+
+			const first = addMessage(late.entries, {
+				from: "x",
+				text: "one",
+				msgid: "b1",
+				batch: "b1",
+				line: {index: 1, sent: 2, total: 2},
+			});
+			expect(first.entries).to.have.length(1);
+			expect(first.entries[0].msgid).to.equal("b1");
+			expect(first.entries[0].text).to.equal("one\ntwo");
+
+			// A line without one never clears it.
+			const again = addMessage(first.entries, {
+				from: "x",
+				text: "two",
+				batch: "b1",
+				line: {index: 2, sent: 2, total: 2},
+			});
+			expect(again.entries[0].msgid).to.equal("b1");
+		});
+
 		it("marks a capped message as incomplete", function () {
 			const {entries} = addMessage([], {
 				from: "x",

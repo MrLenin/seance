@@ -29,23 +29,6 @@
 			<NetworkList />
 		</div>
 		<footer id="footer">
-			<span
-				v-if="canAddNetwork"
-				class="tooltipped tooltipped-n tooltipped-no-touch"
-				aria-label="Connect to network"
-				><router-link
-					v-slot:default="{navigate, isActive}"
-					to="/connect"
-					role="tab"
-					aria-controls="connect"
-				>
-					<button
-						:class="['icon', 'connect', {active: isActive}]"
-						:aria-selected="isActive"
-						@click="navigate"
-						@keypress.enter="navigate"
-					/> </router-link
-			></span>
 			<span class="tooltipped tooltipped-n tooltipped-no-touch" aria-label="Settings"
 				><router-link
 					v-slot:default="{navigate, isActive}"
@@ -93,7 +76,6 @@
 import {computed, defineComponent, nextTick, onMounted, onUnmounted, PropType, ref} from "vue";
 import {useRoute} from "vue-router";
 import {useStore} from "../js/store";
-import {brandingFeatures} from "../js/branding";
 import NetworkList from "./NetworkList.vue";
 import {devtoolsAvailable, toggleDevtools} from "../js/devtools";
 
@@ -254,17 +236,9 @@ export default defineComponent({
 		});
 
 		const appName = computed(() => store.state.branding.appName);
-		// With `features.multiNetwork: false` the connect button disappears once
-		// the (single) network exists.
-		const canAddNetwork = computed(
-			() =>
-				brandingFeatures(store.state.branding).multiNetwork ||
-				store.state.networks.length === 0
-		);
 
 		return {
 			appName,
-			canAddNetwork,
 			isDevelopment,
 			toggleDevtools,
 			store,

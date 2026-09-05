@@ -926,16 +926,17 @@ async function handlePushNow(raw) {
 			// every line by it though only the first carries a msgid; the worker
 			// remembers lines one by one (`<batch>#<index>`) so the rest of a
 			// batch still lands.
-			const seenKey = batch ? batch + "#" + line.index : msgid;
+			const seenId = batch || msgid;
+			const seenKey = line ? seenId + "#" + line.index : msgid;
 
-			if (msgid || batch) {
+			if (seenId) {
 				const seen = await idbGet("seen");
 
 				if (
 					Array.isArray(seen) &&
 					((msgid && seen.includes(msgid)) ||
-						(batch && seen.includes(batch)) ||
-						(seenKey && seen.includes(seenKey)))
+						seen.includes(seenId) ||
+						seen.includes(seenKey))
 				) {
 					return;
 				}
@@ -1021,7 +1022,7 @@ async function handlePushNow(raw) {
 				actions,
 			});
 
-			if (seenKey) {
+			if (seenId) {
 				await idbAppend("seen", seenKey, SEEN_CAP);
 			}
 
