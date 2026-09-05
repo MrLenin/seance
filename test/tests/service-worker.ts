@@ -670,6 +670,56 @@ describe("service worker push notifications", function () {
 		expect(live[0].body).to.equal("line 1\nline 2\nline 3\nline 4\nline 5");
 	});
 
+	it("reassembles a batch whose later lines carry no msgid, and keeps the msgid as the reply target", async function () {
+		// draft/multiline's fallback form: msgid on the first line only; every
+		// line carries the batch reference. Delivered out of order.
+		const sw = makeSW();
+		const T = "2026-09-02T19:59:00.000Z";
+		const line = (i: number, text: string) =>
+			`@batch=b3;${
+				i === 1 ? "msgid=b3;" : ""
+			}time=${T};evilnet.github.io/line=${i}/3/3 :bob!u@h PRIVMSG pushtest :${text}`;
+
+		await firePush(sw, line(2, "two"));
+		await firePush(sw, line(3, "three"));
+		await firePush(sw, line(1, "one"));
+
+		const live = sw.records.filter((n) => !n.closed);
+		expect(live).to.have.lengthOf(1);
+		expect(live[0].data.count).to.equal(1);
+		expect(live[0].body).to.equal("one\ntwo\nthree");
+		const last = live[0].data.messages[live[0].data.messages.length - 1];
+		expect(last.msgid, "the batch's msgid, brought by the late first line").to.equal("b3");
+	});
+
+	it("drops every line of a batch the live page already saw, msgid on the first line only", async function () {
+		const sw = makeSW();
+		const T = "2026-09-02T19:59:00.000Z";
+		const line = (i: number, text: string) =>
+			`@batch=b4;${
+				i === 1 ? "msgid=b4;" : ""
+			}time=${T};evilnet.github.io/line=${i}/2/2 :bob!u@h PRIVMSG pushtest :${text}`;
+
+		// The page recorded the batch's msgid from the BATCH opener (push-seen.ts).
+		sw.kv.set("seen", ["b4"]);
+		await firePush(sw, line(2, "two"));
+		await firePush(sw, line(1, "one"));
+		expect(sw.shown, "seen batch, no msgid on line 2").to.have.lengthOf(0);
+
+		// A different batch still lands, and a redelivered line of it shows nothing more.
+		const other = (i: number, text: string) =>
+			`@batch=b5;${
+				i === 1 ? "msgid=b5;" : ""
+			}time=${T};evilnet.github.io/line=${i}/2/2 :bob!u@h PRIVMSG pushtest :${text}`;
+		await firePush(sw, other(2, "b"));
+		await firePush(sw, other(2, "b"));
+		await firePush(sw, other(1, "a"));
+		expect(sw.shown, "one notification per shown line of the unseen batch").to.have.lengthOf(2);
+		const live = sw.records.filter((n) => !n.closed);
+		expect(live).to.have.lengthOf(1);
+		expect(live[0].body).to.equal("a\nb");
+	});
+
 	it("a MARKREAD line closes the target's notification when it postdates the message", async function () {
 		const sw = makeSW();
 

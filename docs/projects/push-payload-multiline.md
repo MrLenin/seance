@@ -61,9 +61,18 @@ are dropped (the draft allows it). `<host>` is the sender's displayed host.
 ### 3.2 Multiline message: one push per line
 
 ```
-@batch=<ref>;msgid=<base>;time=<iso8601>[;account=<account>];evilnet.github.io/line=<i>/<sent>/<total>[;draft/multiline-concat] :<nick>!<user>@<host> PRIVMSG|NOTICE <target> :<line>
+@batch=<ref>;msgid=<base>;time=<iso8601>[;account=<account>];evilnet.github.io/line=1/<sent>/<total> :<nick>!<user>@<host> PRIVMSG|NOTICE <target> :<line>
+@batch=<ref>;time=<iso8601>[;account=<account>];evilnet.github.io/line=<i>/<sent>/<total>[;draft/multiline-concat] :<nick>!<user>@<host> PRIVMSG|NOTICE <target> :<line>
 ```
 
+- This is draft/multiline's fallback form, the shape for a receiver that
+  does not get the batch: `msgid` on the first line only ("Servers MUST
+  only include a message ID on the first message of a batch when sending a
+  fallback"), `batch` on every line as a batch's lines carry it, `time` and
+  `account` repeated ("MAY also be included on subsequent lines where it
+  makes sense"). nefarious2 `fa9c596`. The worker groups on `batch` and
+  takes the msgid from whichever line brings it (push delivery keeps no
+  order); the seen ring is keyed by the batch reference for batch lines.
 - `<ref>` is the batch reference the server used when relaying the batch;
   `<base>` is the batch's single msgid; `time` is the batch's timestamp.
   (A nefarious2 multiline batch has one msgid and one timestamp for all its
