@@ -6,15 +6,16 @@
 		<Navigation />
 
 		<div class="container">
-			<form ref="settingsForm" autocomplete="off" @change="onChange" @submit.prevent>
+			<div @change="onChange">
 				<router-view></router-view>
-			</form>
+			</div>
 		</div>
 	</div>
 </template>
 
 <script lang="ts">
 import {defineComponent} from "vue";
+import {useRoute} from "vue-router";
 import SidebarToggle from "../SidebarToggle.vue";
 import Navigation from "../Settings/Navigation.vue";
 import {useStore} from "../../js/store";
@@ -27,8 +28,15 @@ export default defineComponent({
 	},
 	setup() {
 		const store = useStore();
+		const route = useRoute();
 
 		const onChange = (event: Event) => {
+			// NetworkEdit has its own form and persistence contract; its fields
+			// are not global client settings.
+			if (route.name === "NetworkEdit") {
+				return;
+			}
+
 			const ignore = ["old_password", "new_password", "verify_password"];
 
 			const name = (event.target as HTMLInputElement).name;

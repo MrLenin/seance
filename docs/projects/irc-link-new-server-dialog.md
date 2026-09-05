@@ -56,8 +56,8 @@ saved, connect to (or focus) that network and join the channel.
 
 ## Outcome (2026-09-05)
 
-Implemented as designed, with the `Connect` window in a "suggested by link"
-mode rather than a separate modal:
+Implemented with the `Connect` form as a blocking modal in "suggested by
+link" mode:
 
 - `client/js/helpers/linkTarget.ts` — `linkSuggestion()` reads the
   query-parameter object and never reads `saslPassword` or `autoconnect`;
@@ -74,8 +74,10 @@ mode rather than a separate modal:
   `linkIgnored=<host>` and none of the link's fields applied.
 - `client/components/Windows/Connect.vue` — the banner, the `savedLink`
   pre-fill (password field focused), `saslPassword` dropped from
-  `CONNECT_PARAMS`, and the `?autoconnect=1` auto-submit removed: connecting
-  to a server that is not saved always takes a click.
+  `CONNECT_PARAMS`, and the `?autoconnect=1` auto-submit removed. An unknown
+  server blocks normal startup in a modal: saved autoconnect networks start
+  only after the user connects or chooses Not now.
 - `client/js/helpers/parseIrcUri.ts` percent-decodes the channel part, so
   `web+irc://host/%23chan%20key` can carry a join key.
-- Browser check: `tools/scenarios/link-approval.mjs`.
+- Browser checks: `tools/scenarios/link-approval.mjs` and
+  `tools/scenarios/link-approval-autoconnect.mjs`.

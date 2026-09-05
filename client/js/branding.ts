@@ -32,7 +32,7 @@ export interface BrandingLinks {
 export interface BrandingFeatures {
 	/** Allow connecting to more than one network at a time. Default true. */
 	multiNetwork?: boolean;
-	/** Show the saved-networks picker on the connect form. Default true. */
+	/** Show network management and local save options. Default true. */
 	saveNetworks?: boolean;
 	/**
 	 * Allow connecting to servers other than `defaultNetwork`. Default true.

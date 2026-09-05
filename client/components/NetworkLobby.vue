@@ -84,7 +84,7 @@ export default defineComponent({
 		});
 
 		const editNetwork = () => {
-			void router.push(`/edit-network/${props.network.uuid}`);
+			void router.push(`/settings/networks/${props.network.uuid}`);
 		};
 
 		const statusClass = computed(() =>

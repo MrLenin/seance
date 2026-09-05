@@ -1,21 +1,33 @@
 <template>
-	<NetworkForm
-		v-if="networkData"
-		:handle-submit="handleSubmit"
-		:handle-action="handleAction"
-		:status="status"
-		:defaults="networkData"
-		:disabled="disabled"
-	/>
+	<div>
+		<router-link class="network-settings-back" to="/settings/networks">← Networks</router-link>
+		<NetworkForm
+			v-if="networkData"
+			:handle-submit="handleSubmit"
+			:handle-action="handleAction"
+			:status="status"
+			:defaults="networkData"
+			:disabled="disabled"
+			:embedded="true"
+		/>
+	</div>
 </template>
+
+<style>
+.network-settings-back {
+	display: inline-block;
+	margin-top: 20px;
+}
+</style>
 
 <script lang="ts">
 import {computed, defineComponent, onMounted, reactive, ref, watch} from "vue";
 import {useRoute} from "vue-router";
-import {navigate, switchToChannel} from "../../js/router";
+import {navigate} from "../../js/router";
 import socket from "../../js/socket";
 import {useStore} from "../../js/store";
 import type {SavedNetwork} from "../../js/irc/saved-networks";
+import * as saved from "../../js/irc/saved-networks";
 import NetworkForm, {ConnectionAction, NetworkFormDefaults} from "../NetworkForm.vue";
 
 /**
@@ -57,9 +69,11 @@ export default defineComponent({
 			socket.off("network:info", onInfo);
 
 			if (!received) {
-				// Not saved and not live: nothing to edit.
+				const stored = saved.get(uuid);
 				const network = store.getters.findNetwork(uuid);
-				received = network
+				received = stored
+					? reactive({...stored, connected: network?.status.connected ?? false})
+					: network
 					? reactive({
 							uuid,
 							name: network.name,
@@ -82,15 +96,7 @@ export default defineComponent({
 		const handleSubmit = (data: SavedNetwork) => {
 			disabled.value = true;
 			socket.emit("network:edit", data);
-
-			const network = store.getters.findNetwork(data.uuid);
-
-			if (network) {
-				switchToChannel(network.channels[0]);
-			} else {
-				void navigate("Connect");
-			}
-
+			void navigate("Networks");
 			disabled.value = false;
 		};
 

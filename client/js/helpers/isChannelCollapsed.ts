@@ -1,13 +1,5 @@
-import {store} from "../store";
+import type {ClientChan, ClientNetwork} from "../types";
+import {ChanType} from "../../../shared/types/chan";
 
-export default (network, channel) => {
-	if (!network.isCollapsed || channel.highlight || channel.type === "lobby") {
-		return false;
-	}
-
-	if (store.state.activeChannel && channel === store.state.activeChannel.channel) {
-		return false;
-	}
-
-	return true;
-};
+export default (network: ClientNetwork, channel: ClientChan): boolean =>
+	network.isCollapsed && channel.type !== ChanType.LOBBY;

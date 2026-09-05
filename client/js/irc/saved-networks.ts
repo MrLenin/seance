@@ -2,11 +2,10 @@
  * Saved network configs, persisted in localStorage under `thelounge.networks`.
  *
  * TheLounge kept the user's networks in the server-side user file; here the
- * connect form's values are remembered locally so the connect screen can
- * offer a picker and `Windows/NetworkEdit.vue` has something to edit. Each
- * entry carries a stable `uuid` (random, generated once) because sort, mute
- * and collapse preferences are keyed by it (see docs/resources/bus-contract.md
- * §"Store expectations").
+ * connect form's values are remembered locally so Settings → Networks can
+ * manage them. Each entry carries a stable `uuid` (random, generated once)
+ * because network settings and sort, mute and collapse preferences are keyed
+ * by it (see docs/resources/bus-contract.md §"Store expectations").
  *
  * The SASL password is only written to disk when `rememberPassword` is set;
  * otherwise `saslPassword` is stripped on save and the user is asked again.

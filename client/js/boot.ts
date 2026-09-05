@@ -30,7 +30,7 @@ import {installNativeHooks} from "./native";
 import {installForegroundHooks} from "./foreground";
 import {onLaunch} from "./pwa";
 // Also registers the IRC layer's bus handlers (input, names, more, network:*).
-import {clientForNetwork, createNetwork} from "./irc/manager";
+import {autoconnectSavedNetworks, clientForNetwork, createNetwork} from "./irc/manager";
 
 declare global {
 	interface Window {
@@ -122,6 +122,12 @@ export async function boot(): Promise<void> {
 		// waiting for the user's approval.
 		return;
 	}
+
+	// Startup owns autoconnect. Navigating to a screen must never create a
+	// connection as a side effect (the old Connect-screen hook did exactly
+	// that). Unknown-server links return above and resume this only after the
+	// user accepts or declines their blocking prompt.
+	autoconnectSavedNetworks();
 
 	// If we are on an unknown route, open the last known channel, or the
 	// connect form if there is none.

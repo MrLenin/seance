@@ -117,8 +117,8 @@ export function createNetwork(options: CreateNetworkOptions): IrcClient {
 
 /**
  * Connect every saved network flagged `autoconnect`. Runs once per page load
- * (the connect screen calls it on mount); entries that need a SASL password
- * that was not remembered are skipped so the user can type it.
+ * from boot; entries that need a SASL password that was not remembered are
+ * skipped so the user can type it.
  */
 let autoconnectDone = false;
 
