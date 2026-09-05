@@ -14,8 +14,14 @@ define our own scheme instead.
 - No port means **443** — `wss://host/`, what a public deploy should serve.
 - Channels may sit in the path or the fragment, comma-separated, with or
   without a leading `#` (`client/components/Windows/Connect.vue` normalises).
-- A link only ever **pre-fills the connect form**. Nothing connects, and
-  nothing is saved, until the user clicks.
+- A link is a **suggestion**. If its host + port match a saved network, that
+  server was approved before: Seance connects to (or focuses) it and joins
+  the channels. Anything else opens the connect form pre-filled, with a
+  banner naming what the link asked for — nothing connects and nothing is
+  saved until the user clicks. Locked deploys (`lockHost` /
+  `allowCustomServer: false`) refuse links to other hosts with a message.
+  A URL can never supply a password, and `?autoconnect=1` is not honoured
+  from URLs (`client/js/helpers/linkTarget.ts` decides, `boot.ts` applies).
 
 `irc:`/`ircs:` links are still parsed if one reaches us by hand (`?uri=`), for
 their host and channels; their port is dropped and 443 assumed.
@@ -45,12 +51,12 @@ scheme is the whole cost, which is why nothing here depends on it.
 | `client/manifest.webmanifest`              | `protocol_handlers`: the installed PWA claims `web+irc` → `./?uri=%s`      |
 | `client/components/Settings/General.vue`   | pre-install equivalent, `registerProtocolHandler("web+irc", …)`, in a tab  |
 | `client/js/helpers/parseIrcUri.ts`         | `?uri=` → `{name, host, port, join, tls}`                                  |
+| `client/js/helpers/linkTarget.ts`          | matches the link against saved networks / deploy policy; strips secrets    |
 | `client/js/boot.ts`                        | `handleQueryParams()` pushes those onto the `Connect` route                |
 | `client/js/pwa.ts`                         | `launchQueue`: a link with the app already open does not reload it         |
 | `shells/electron/main.js` + `package.json` | `setAsDefaultProtocolClient("web+irc")`, argv/`open-url`, electron-builder |
 | `test/tests/build.ts`                      | asserts the built manifest still carries the handler                       |
 
 Not wired yet: the Capacitor shells (an Android `intent-filter` and iOS
-`CFBundleURLTypes` entry would do it), and matching a link against saved
-networks instead of always opening the connect form — see
-`docs/projects/irc-link-new-server-dialog.md`.
+`CFBundleURLTypes` entry would do it). Matching a link against saved networks
+landed 2026-09-05 — see `docs/projects/irc-link-new-server-dialog.md`.

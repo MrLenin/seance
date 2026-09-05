@@ -14,8 +14,10 @@ import AppearanceSettings from "../components/Settings/Appearance.vue";
 import GeneralSettings from "../components/Settings/General.vue";
 import AccountSettings from "../components/Settings/Account.vue";
 import NotificationSettings from "../components/Settings/Notifications.vue";
+import NetworkSettings from "../components/Settings/Networks.vue";
 import {ClientChan} from "./types";
 import {shouldShowGeneralSettings} from "./helpers/settingsTabs";
+import * as saved from "./irc/saved-networks";
 import {clearPendingTarget, setPendingTarget} from "./helpers/pendingTarget";
 
 const router = createRouter({
@@ -36,6 +38,16 @@ const router = createRouter({
 			path: "/settings",
 			component: Settings,
 			children: [
+				{
+					name: "Networks",
+					path: "networks",
+					component: NetworkSettings,
+				},
+				{
+					name: "NetworkEdit",
+					path: "networks/:uuid",
+					component: NetworkEdit,
+				},
 				{
 					name: "General",
 					path: "",
@@ -78,9 +90,8 @@ const router = createRouter({
 			component: Changelog,
 		},
 		{
-			name: "NetworkEdit",
 			path: "/edit-network/:uuid",
-			component: NetworkEdit,
+			redirect: (to) => `/settings/networks/${String(to.params.uuid)}`,
 		},
 		{
 			name: "RoutedChat",
@@ -176,7 +187,11 @@ router.beforeEach((to, from) => {
 	}
 
 	// Disallow navigating to invalid networks
-	if (to.name === "NetworkEdit" && !store.getters.findNetwork(String(to.params.uuid))) {
+	if (
+		to.name === "NetworkEdit" &&
+		!store.getters.findNetwork(String(to.params.uuid)) &&
+		!saved.get(String(to.params.uuid))
+	) {
 		return false;
 	}
 

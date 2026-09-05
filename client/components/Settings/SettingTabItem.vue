@@ -1,8 +1,8 @@
 <template>
-	<li :aria-label="name" role="tab" :aria-selected="route.name === name" aria-controls="settings">
+	<li :aria-label="name" role="tab" :aria-selected="isActiveRoute" aria-controls="settings">
 		<router-link v-slot:default="{navigate, isExactActive}" :to="'/settings/' + to" custom>
 			<button
-				:class="['icon', className, {active: isExactActive}]"
+				:class="['icon', className, {active: isExactActive || isActiveRoute}]"
 				@click="navigate"
 				@keypress.enter="navigate"
 			>
@@ -13,7 +13,7 @@
 </template>
 
 <script lang="ts">
-import {defineComponent} from "vue";
+import {computed, defineComponent} from "vue";
 import {useRoute} from "vue-router";
 
 export default defineComponent({
@@ -32,11 +32,17 @@ export default defineComponent({
 			required: true,
 		},
 	},
-	setup() {
+	setup(props) {
 		const route = useRoute();
+		const isActiveRoute = computed(
+			() =>
+				route.name === props.name ||
+				(props.name === "Networks" && route.name === "NetworkEdit")
+		);
 
 		return {
 			route,
+			isActiveRoute,
 		};
 	},
 });

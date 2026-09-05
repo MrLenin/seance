@@ -71,7 +71,7 @@ export function generateChannelContextMenu(
 				label: "Edit this network…",
 				type: "item",
 				class: "edit",
-				link: `/edit-network/${network.uuid}`,
+				link: `/settings/networks/${network.uuid}`,
 			},
 			{
 				label: "Join a channel…",
