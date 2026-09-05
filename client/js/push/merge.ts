@@ -98,6 +98,16 @@ export function addMessage(
 			lines: {},
 		};
 
+		// The batch's msgid rides its first line only (draft/multiline's
+		// fallback form: "MUST only include a message ID on the first message
+		// of a batch"); later lines carry the batch reference alone. Push
+		// delivery keeps no order, so the entry may have been created by a
+		// later line -- take the msgid from whichever line brings it. It is
+		// the reply target (replyTargetOf in the worker).
+		if (!entry.msgid && incoming.msgid) {
+			entry.msgid = incoming.msgid;
+		}
+
 		entry.lines = entry.lines ?? {};
 		entry.lines[String(incoming.line.index)] = {
 			text: incoming.text,

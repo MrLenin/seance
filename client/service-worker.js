@@ -914,21 +914,34 @@ async function handlePushNow(raw) {
 			// across its lines: the page saw it on the BATCH opener and blocks
 			// them all; the worker remembers lines one by one so the rest of a
 			// batch still lands.
-			const seenKey = line ? msgid + "#" + line.index : msgid;
-
-			if (msgid) {
-				const seen = await idbGet("seen");
-
-				if (Array.isArray(seen) && (seen.includes(msgid) || seen.includes(seenKey))) {
-					return;
-				}
-			}
-
+			//
+			// The batch's msgid rides its first line only (draft/multiline's
+			// fallback form); later lines carry the batch reference, which the
+			// server makes the batch's msgid. So a batch line is remembered and
+			// looked up by that reference: the page's record of the opener's
+			// msgid blocks every line, and the worker's per-line record
+			// (ref#index) survives a redelivery of that line alone.
 			const batch = line
 				? typeof parsed.tags.batch === "string"
 					? parsed.tags.batch
 					: msgid
 				: undefined;
+			const seenId = batch || msgid;
+			const seenKey = line ? seenId + "#" + line.index : msgid;
+
+			if (seenId) {
+				const seen = await idbGet("seen");
+
+				if (
+					Array.isArray(seen) &&
+					((msgid && seen.includes(msgid)) ||
+						seen.includes(seenId) ||
+						seen.includes(seenKey))
+				) {
+					return;
+				}
+			}
+
 			const isChannel = isChannelName(parsed.target);
 			const replyTo = isChannel ? parsed.target : parsed.nick;
 			const tag = "push-" + (replyTo || "activity");
@@ -1009,7 +1022,7 @@ async function handlePushNow(raw) {
 				actions,
 			});
 
-			if (msgid) {
+			if (seenId) {
 				await idbAppend("seen", seenKey, SEEN_CAP);
 			}
 
