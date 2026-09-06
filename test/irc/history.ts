@@ -477,10 +477,36 @@ describe("Chat history (history.ts)", function () {
 			expect(ids).to.deep.equal([...ids].sort((a, b) => a - b));
 			expect(Math.max(...ids)).to.be.below(Math.min(...msgs(id).map((p) => p.msg.id)));
 			expect(chan.shared.totalMessages).to.equal(before + 3);
-			// Short page: no more history (totalMessages == shown + new).
-			expect(more.totalMessages).to.equal(before + 3);
+			// A short page without draft/chathistory-end is not the end: the
+			// server may have cut its walk short (totalMessages == shown + new + 1
+			// keeps the "show older messages" control).
+			expect(more.totalMessages).to.equal(before + 3 + 1);
 			expect(pendingHistory(h.client)).to.have.length(0);
 			expect(chan.msgRefs.get(ids[0])).to.deep.include({msgid: "m1"});
+		});
+
+		it("a short page carrying draft/chathistory-end is the end; an empty page always is", function () {
+			const h = setup();
+			const id = joined(h);
+			h.transport.line(
+				"@msgid=live-1;time=2026-08-25T12:01:00.000Z :bob!bob@host PRIVMSG #seance :live"
+			);
+			const live = msgs(id)[0].msg;
+			const chan = h.client.findChannel("#seance")!;
+
+			socket.emit("more", {target: id, lastId: live.id, condensed: false});
+			reply(h, h.sent(), [hist(1), hist(2)], undefined, true);
+			let [more] = mores(id);
+			expect(more.messages.map((m) => m.msgid)).to.deep.equal(["m1", "m2"]);
+			// End tag: nothing older (totalMessages == shown + new).
+			expect(more.totalMessages).to.equal(chan.shared.totalMessages);
+
+			dispatch.resetHistory();
+			socket.emit("more", {target: id, lastId: more.messages[0].id, condensed: false});
+			reply(h, h.sent(), []);
+			[more] = mores(id);
+			expect(more.messages).to.have.length(0);
+			expect(more.totalMessages).to.equal(chan.shared.totalMessages);
 		});
 
 		it("keeps `moreHistoryAvailable` while the server returns full pages", function () {

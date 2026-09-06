@@ -485,8 +485,16 @@ function resolve(
 	}
 
 	// A timeout may be transient: leave the "show older messages" button
-	// so the user can retry. FAIL / ACK / a short page mean there is no more.
-	deliverPrepend(client, chan, messages, fullPage || outcome === "timeout");
+	// so the user can retry. FAIL / ACK / an empty page mean there is no
+	// more. A page that came back short is NOT the end unless the server
+	// says so: draft/chathistory-end on the batch is the spec's signal, and
+	// a server that filters the walk (nefarious2's presence-aware paging
+	// caps the raw scan) hands back short pages that are not final --
+	// reading fullness stopped the scrollback where the server had more
+	// (2026-09-06). An older server that never sends the tag ends with an
+	// empty page, which still closes the button.
+	const more = outcome === "timeout" || (lines !== null && lines.length > 0 && !end) || fullPage;
+	deliverPrepend(client, chan, messages, more);
 	runAfter(after);
 }
 
