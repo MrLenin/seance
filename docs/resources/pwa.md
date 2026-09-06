@@ -34,8 +34,9 @@ Ship `NODE_ENV=production corepack yarn build`.
   makes Chrome focus the running window for any later launch (taskbar/app
   icon, `web+irc://` link, `?uri=` URL) and hand the URL to
   `window.launchQueue`. `pwa.ts` feeds that into the same `handleQueryParams`
-  path `boot.ts` uses for a fresh open, so a `web+irc://host/#chan` link opens
-  the connect form pre-filled **without reloading** and dropping live IRC
+  path `boot.ts` uses for a fresh open, so a `web+irc://host/#chan` link joins
+  the channel on an already-approved (saved) network — or opens the connect
+  form pre-filled for approval — **without reloading** and dropping live IRC
   connections. Without this, every launch was a reload.
 - **`web+irc:` links.** `protocol_handlers` in the manifest registers the app
   for the scheme at install time (Chrome asks once, on first use). The
@@ -64,13 +65,21 @@ Ship `NODE_ENV=production corepack yarn build`.
   ("update available") and shows a "Reload to update" button at the top of
   Help. Same-version redeploys are picked up silently because runtime fetches
   are network-first. Installed windows have no reload button, hence the
-  in-app one (Ctrl/Cmd+R also works).
+  in-app one (Ctrl/Cmd+R also works). The per-network **push-only workers**
+  (`push/<uuid>/`, see `client/js/webpush.ts`) get none of that for free: no
+  navigation ever lands inside their scope, a push event re-checks the script
+  at most once a day, and `register()` with the same URL checks nothing — so
+  the page calls `registration.update()` on every stored network's
+  registration as it boots (`syncStoredWithBrowser`) and whenever a subscribe
+  reuses one (`ensureRegistration`). Browser check:
+  `tools/scenarios/push-worker-update.mjs`.
 - **Notifications.** In-page `Notification`s are routed through the worker
   (`socket-events/msg.ts` → `{type: "notification"}` → `showNotification`), so
   clicking one focuses the app window, or reopens it on `#/chan-<id>` if it was
-  closed. There is **no Web Push**: with no server to hold subscriptions,
-  notifications only arrive while the app is running (in the background is
-  fine on desktop; mobile OSes suspend the WebSocket — see the Capacitor README).
+  closed. Web Push (`draft/webpush`, the ircd holds the subscriptions) covers
+  the app when it is closed or the OS has suspended its WebSocket — one
+  push-only registration per network; see `docs/projects/push-subscription.md`
+  and `push-per-network.md`.
 
 ## Verifying a deploy
 

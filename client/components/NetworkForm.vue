@@ -1,9 +1,14 @@
 <template>
-	<div id="connect" class="window" role="tabpanel" aria-label="Edit network">
-		<div class="header">
+	<div
+		id="connect"
+		:class="['window', {'network-form-embedded': embedded}]"
+		:role="embedded ? undefined : 'tabpanel'"
+		aria-label="Edit network"
+	>
+		<div v-if="!embedded" class="header">
 			<SidebarToggle />
 		</div>
-		<form class="container" method="post" action="" @submit.prevent="onSubmit">
+		<form :class="{container: !embedded}" method="post" action="" @submit.prevent="onSubmit">
 			<h1 class="title">
 				<input v-model="defaults.uuid" type="hidden" name="uuid" />
 				Edit {{ displayName(defaults) }}
@@ -276,6 +281,19 @@ the server tab on new connection"
 	margin-bottom: 10px;
 }
 
+#connect.network-form-embedded {
+	display: block;
+	height: auto;
+	overflow: visible;
+	background: transparent;
+	border-radius: 0;
+	box-shadow: none;
+}
+
+#connect.network-form-embedded h1 {
+	font-size: 28px;
+}
+
 #connect .connect-row.connect-auth .opt {
 	display: block;
 	width: 100%;
@@ -355,6 +373,7 @@ export default defineComponent({
 			required: true,
 		},
 		disabled: Boolean,
+		embedded: Boolean,
 		/** Live connection state; shows the status row when given. */
 		status: {
 			type: Object as PropType<SharedNetworkStatus | null>,

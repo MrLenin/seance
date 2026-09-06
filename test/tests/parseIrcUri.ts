@@ -87,4 +87,32 @@ describe("parseIrcUri helper", function () {
 		obj.join = "chan";
 		expect(parseIrcUri("web+irc://example.com:1337/chan#")).to.deep.equal(obj);
 	});
+
+	it("should decode an encoded channel and key", function () {
+		expect(parseIrcUri("web+irc://example.com/%23chan%20key")).to.deep.equal({
+			tls: true,
+			name: "example.com",
+			host: "example.com",
+			port: "443",
+			join: "#chan key",
+		});
+
+		expect(parseIrcUri("web+irc://example.com/#chan%20key,%23other")).to.deep.equal({
+			tls: true,
+			name: "example.com",
+			host: "example.com",
+			port: "443",
+			join: "#chan key,#other",
+		});
+	});
+
+	it("should keep a channel whose percent sequence does not decode", function () {
+		expect(parseIrcUri("web+irc://example.com/#50%off")).to.deep.equal({
+			tls: true,
+			name: "example.com",
+			host: "example.com",
+			port: "443",
+			join: "#50%off",
+		});
+	});
 });

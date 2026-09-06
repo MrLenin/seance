@@ -1,60 +1,20 @@
 <template>
-	<div id="connect" class="window" role="tabpanel" aria-label="Connect">
-		<div class="header">
+	<div
+		id="connect"
+		:class="['window', {'link-approval': fromLink}]"
+		:role="fromLink ? 'dialog' : 'tabpanel'"
+		:aria-modal="fromLink ? 'true' : undefined"
+		aria-label="Connect"
+	>
+		<div v-if="!fromLink" class="header">
 			<SidebarToggle />
 		</div>
 		<form class="container" method="post" action="" @submit.prevent="onSubmit">
-			<h1 class="title">{{ t("connect.title") }}</h1>
+			<h1 class="title">{{ fromLink ? "Connect to a new server?" : t("connect.title") }}</h1>
 
-			<h2 v-if="showSavedNetworks">{{ t("connect.savedNetworks") }}</h2>
-			<div
-				v-if="showSavedNetworks && savedNetworks.length === 0"
-				class="saved-networks-empty"
-			>
-				{{ t("connect.savedNetworksEmpty") }}
+			<div v-if="linkNotice" class="connect-notice connect-link-notice">
+				{{ linkNotice }}
 			</div>
-			<ul
-				v-else-if="showSavedNetworks"
-				class="saved-networks"
-				:aria-label="t('connect.savedNetworks')"
-			>
-				<li
-					v-for="net in savedNetworks"
-					:key="net.uuid"
-					:class="['saved-network', {selected: net.uuid === selectedUuid}]"
-				>
-					<button
-						type="button"
-						class="saved-network-pick"
-						:title="'Fill the form with ' + displayName(net)"
-						@click="prefill(net)"
-					>
-						<span class="saved-network-name">{{ displayName(net) }}</span>
-						<span class="saved-network-detail">
-							<template v-if="!hostLocked">{{ net.host }}:{{ net.port }} · </template
-							>{{ net.nick }}
-							<template v-if="net.autoconnect"> · auto</template>
-						</span>
-					</button>
-					<button
-						type="button"
-						class="btn btn-small"
-						:disabled="savedNetworkBusy(net.uuid)"
-						@click="connectSaved(net)"
-					>
-						{{ savedNetworkLabel(net.uuid) }}
-					</button>
-					<button
-						type="button"
-						class="btn btn-small saved-network-delete"
-						:aria-label="'Delete ' + displayName(net)"
-						title="Delete this saved network"
-						@click="removeSaved(net)"
-					>
-						✕
-					</button>
-				</li>
-			</ul>
 
 			<h2 v-if="!hostLocked">Server</h2>
 			<div v-if="hostLocked" class="connect-row connect-network">
@@ -222,7 +182,10 @@
 				>…
 			</div>
 
-			<div>
+			<div :class="{'link-approval-buttons': fromLink}">
+				<button v-if="fromLink" type="button" class="btn btn-cancel" @click="cancelLink">
+					Not now
+				</button>
 				<button type="submit" class="btn">{{ t("connect.submit") }}</button>
 			</div>
 		</form>
@@ -239,70 +202,43 @@
 	color: #31708f;
 }
 
-#connect .saved-networks {
-	list-style: none;
-	margin: 0 0 10px;
-	padding: 0;
-}
-
-#connect .saved-network {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	padding: 4px 6px;
-	border-radius: 3px;
-}
-
-#connect .saved-network.selected {
-	background-color: rgb(132 206 136 / 15%);
-}
-
-#connect .saved-network-pick {
-	flex-grow: 1;
-	display: flex;
-	flex-direction: column;
-	align-items: flex-start;
-	text-align: left;
-	cursor: pointer;
-	padding: 4px 6px;
-	border: 0;
-	background: none;
-	color: inherit;
-	font: inherit;
-	min-width: 0;
-}
-
-#connect .saved-network-pick:hover,
-#connect .saved-network-pick:focus {
-	text-decoration: underline;
-}
-
-#connect .saved-network-name {
-	font-weight: bold;
-}
-
-#connect .saved-network-detail {
-	font-size: 12px;
-	opacity: 0.7;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	max-width: 100%;
-}
-
-#connect .saved-network .btn {
-	width: auto;
-	margin: 0;
-	flex-shrink: 0;
-}
-
-#connect .saved-network-delete {
-	letter-spacing: 0;
-	word-spacing: 0;
-}
-
 #connect .connect-network .input-wrap {
 	padding: 6px 0;
+}
+
+#connect .connect-link-notice {
+	background-color: #fcf8e3;
+	color: #8a6d3b;
+}
+
+#connect.link-approval {
+	position: fixed;
+	inset: 0;
+	z-index: 999;
+	background: rgb(0 0 0 / 90%);
+	padding: 20px;
+}
+
+#connect.link-approval .container {
+	width: min(560px, 100%);
+	margin: auto;
+	padding: 24px;
+	border-radius: 5px;
+	background: var(--window-bg-color);
+}
+
+#connect .link-approval-buttons {
+	display: flex;
+	gap: 10px;
+}
+
+#connect .link-approval-buttons .btn {
+	flex: 1;
+}
+
+#connect .link-approval-buttons .btn-cancel {
+	background: transparent;
+	color: var(--body-color);
 }
 </style>
 
@@ -311,26 +247,23 @@ import {defineComponent, onMounted, reactive, ref, watch} from "vue";
 
 import {useStore} from "../../js/store";
 import {brandingFeatures, brandingString, expandNick} from "../../js/branding";
-import {createNetwork} from "../../js/irc/manager";
+import {autoconnectSavedNetworks, createNetwork} from "../../js/irc/manager";
 import * as saved from "../../js/irc/saved-networks";
-import {defaultPort, displayName, SavedNetwork} from "../../js/irc/saved-networks";
+import {defaultPort, SavedNetwork} from "../../js/irc/saved-networks";
+import {mergeJoinLists} from "../../js/helpers/linkTarget";
+import {router, switchToChannel} from "../../js/router";
 import type {ConnectOptions} from "../../js/irc/types";
 import RevealPassword from "../RevealPassword.vue";
 import SidebarToggle from "../SidebarToggle.vue";
 
 export type {ConnectOptions};
 
-/** URL parameters that pre-fill the form (and so beat the last-used entry). */
-const CONNECT_PARAMS = [
-	"host",
-	"port",
-	"tls",
-	"nick",
-	"join",
-	"channels",
-	"saslAccount",
-	"saslPassword",
-];
+/**
+ * URL parameters that pre-fill the form (and so beat the last-used entry).
+ * `saslPassword` is deliberately not accepted: a link must not carry secrets
+ * (docs/projects/irc-link-new-server-dialog.md).
+ */
+const CONNECT_PARAMS = ["host", "port", "tls", "nick", "join", "channels", "saslAccount"];
 
 export default defineComponent({
 	name: "Connect",
@@ -407,14 +340,9 @@ export default defineComponent({
 
 		/** The saved entry the form was filled from; its uuid is reused on connect. */
 		const selectedUuid = ref<string | null>(null);
-		const savedNetworks = ref<SavedNetwork[]>(saved.list());
 		const submitted = ref<ConnectOptions | null>(null);
 		const notice = ref("");
 		const passwordInput = ref<HTMLInputElement | null>(null);
-
-		const refreshSaved = () => {
-			savedNetworks.value = saved.list();
-		};
 
 		const prefill = (net: SavedNetwork) => {
 			form.host = net.host;
@@ -439,14 +367,36 @@ export default defineComponent({
 			(key) => props.queryParams && props.queryParams[key] !== undefined
 		);
 
-		if (hasConnectParams) {
+		// boot.ts routes here when a web+irc:// link (or a ?host= URL) names a
+		// server that is not approved yet (`fromLink`), was refused by a locked
+		// deploy (`linkIgnored`), or matches a saved network that still needs
+		// its password typed (`savedLink`). See docs/resources/irc-links.md.
+		const savedLinkUuid = firstParam(props.queryParams?.savedLink);
+		const savedLink = savedLinkUuid ? saved.get(savedLinkUuid) : undefined;
+		const linkIgnored = firstParam(props.queryParams?.linkIgnored);
+		const fromLink = isTruthyParam(props.queryParams?.fromLink);
+		let focusPassword = false;
+
+		if (savedLink) {
+			prefill(savedLink);
+			const linkJoin = firstParam(props.queryParams?.join);
+
+			if (linkJoin) {
+				form.join = mergeJoinLists(form.join, linkJoin);
+			}
+
+			if (savedLink.sasl === "plain" && !savedLink.saslPassword) {
+				notice.value = `Enter the password for ${savedLink.saslAccount} to connect.`;
+				focusPassword = true;
+			}
+		} else if (hasConnectParams) {
 			applyQueryParams(form, props.queryParams);
 			pinServer();
 			showSasl.value = form.sasl === "plain" || !!form.saslAccount;
 		} else {
-			// Pre-fill from the last-used entry only while nothing is live yet:
+			// Pre-fill from the last-used entry only while nothing is live yet;
 			// with networks up, this screen is "add another network" and starts
-			// blank (the picker above still reuses a saved entry in one click).
+			// blank. Existing entries are managed in Settings → Networks.
 			const last =
 				showSavedNetworks && store.state.networks.length === 0
 					? saved.lastUsed()
@@ -458,6 +408,15 @@ export default defineComponent({
 				showSasl.value = form.sasl === "plain" || !!form.saslAccount;
 			}
 		}
+
+		// What the link asked for, said out loud — the approval step's context.
+		const linkNotice = linkIgnored
+			? `This app only connects to ${networkLabel}. The link to ${linkIgnored} was ignored.`
+			: fromLink && !savedLink && form.host
+			? `This link suggests connecting to ${form.host}:${form.port}` +
+			  (form.join ? ` and joining ${form.join}` : "") +
+			  ". Nothing is saved until you choose to connect."
+			: "";
 
 		// Follow the TLS checkbox while the port is still one of the defaults.
 		watch(
@@ -488,51 +447,33 @@ export default defineComponent({
 				notifyEnabled: notifyEnabled.value,
 			});
 			selectedUuid.value = client.uuid;
-			refreshSaved();
+			autoconnectSavedNetworks();
 		};
 
-		/** Connect straight from the picker, unless a password still has to be typed. */
-		const connectSaved = (net: SavedNetwork) => {
-			prefill(net);
+		const cancelLink = async () => {
+			autoconnectSavedNetworks();
 
-			if (net.sasl === "plain" && !net.saslPassword) {
-				notice.value = `Enter the password for ${net.saslAccount} to connect.`;
-				void Promise.resolve().then(() => passwordInput.value?.focus());
+			// createNetwork dispatches its lobby synchronously and normally moves
+			// us away from this dialog. If there was nothing to start, return to
+			// an existing network or the ordinary blank connect screen.
+			if (router.currentRoute.value.name !== "Connect") {
 				return;
 			}
 
-			onSubmit();
-		};
+			const firstChannel = store.state.networks[0]?.channels[0];
 
-		const removeSaved = (net: SavedNetwork) => {
-			saved.remove(net.uuid);
-
-			if (selectedUuid.value === net.uuid) {
-				selectedUuid.value = null;
+			if (firstChannel) {
+				switchToChannel(firstChannel);
+			} else {
+				await router.replace({name: "Connect"});
 			}
-
-			refreshSaved();
-		};
-
-		/** Live connection state of a saved entry, scoped to that network's uuid. */
-		const statusOf = (uuid: string) => store.getters.findNetwork(uuid)?.status ?? null;
-
-		const savedNetworkBusy = (uuid: string) => {
-			const status = statusOf(uuid);
-			return !!(status?.connected || status?.connecting);
-		};
-
-		const savedNetworkLabel = (uuid: string) => {
-			const status = statusOf(uuid);
-			return status?.connected ? "Connected" : status?.connecting ? "Connecting…" : "Connect";
 		};
 
 		onMounted(() => {
-			// `?autoconnect=1` with a host and nick skips the form entirely.
-			// (The saved networks flagged autoconnect are boot's business,
-			// client/js/boot.ts: they come up whatever page the URL opened on.)
-			if (isTruthyParam(props.queryParams?.autoconnect) && form.host && form.nick) {
-				onSubmit();
+			// A link to a saved network whose password was not remembered:
+			// everything is filled in but the password, so put the cursor there.
+			if (focusPassword) {
+				passwordInput.value?.focus();
 			}
 		});
 
@@ -549,17 +490,13 @@ export default defineComponent({
 			notifyEnabled,
 			onNotifyToggle,
 			selectedUuid,
-			savedNetworks,
 			submitted,
 			notice,
+			linkNotice,
+			fromLink,
 			passwordInput,
-			displayName,
-			prefill,
-			connectSaved,
-			removeSaved,
-			savedNetworkBusy,
-			savedNetworkLabel,
 			onSubmit,
+			cancelLink,
 		};
 	},
 });
@@ -582,21 +519,12 @@ function applyQueryParams(form: ConnectOptions, params?: Record<string, any>) {
 		return;
 	}
 
-	const first = (value: unknown): string | undefined => {
-		if (Array.isArray(value)) {
-			value = value[0];
-		}
-
-		return value === undefined || value === null ? undefined : String(value);
-	};
-
-	const host = first(params.host);
-	const port = first(params.port);
-	const tls = first(params.tls);
-	const nick = first(params.nick);
-	const join = first(params.join ?? params.channels);
-	const saslAccount = first(params.saslAccount);
-	const saslPassword = first(params.saslPassword);
+	const host = firstParam(params.host);
+	const port = firstParam(params.port);
+	const tls = firstParam(params.tls);
+	const nick = firstParam(params.nick);
+	const join = firstParam(params.join ?? params.channels);
+	const saslAccount = firstParam(params.saslAccount);
 
 	if (host) {
 		form.host = host;
@@ -627,9 +555,14 @@ function applyQueryParams(form: ConnectOptions, params?: Record<string, any>) {
 		form.saslAccount = saslAccount;
 		form.sasl = "plain";
 	}
+}
 
-	if (saslPassword) {
-		form.saslPassword = saslPassword;
+/** First value of a possibly-repeated query parameter, as a string. */
+function firstParam(value: unknown): string | undefined {
+	if (Array.isArray(value)) {
+		value = value[0];
 	}
+
+	return value === undefined || value === null ? undefined : String(value);
 }
 </script>

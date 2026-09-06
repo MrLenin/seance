@@ -135,7 +135,7 @@ No fixed order. Tackle items in whatever sequence the friction dictates.
 4. [x] **Channel info numerics**
    - [x] a. Ban list (367/368), invite exception list (346/347), ban exception list (348/349) into the existing special-channel UI. _Done 2026-08-24: `handlers/lists.ts`; +e lists have their own EXCEPTLIST special view (`Special/ListExcepts.vue`) and `/exceptlist`. 14 tests._
 5. [x] **Saved network configs**
-   - [x] a. Persist the connect form _`client/js/irc/saved-networks.ts` (`thelounge.networks`), picker on Connect, remember-password + autoconnect opt-ins._'s last-used values in localStorage; offer a "saved networks" picker on the connect screen.
+   - [x] a. Persist the connect form _`client/js/irc/saved-networks.ts` (`thelounge.networks`), managed under Settings → Networks, with remember-password + autoconnect opt-ins._'s last-used values in localStorage; offer a network management screen.
    - [x] b. `Windows/NetworkEdit.vue` reads/writes this store _Done; unsupported fields dropped from the form._. `network:get`/`network:edit`/`network:new` route through localStorage.
    - [x] c. Multi-network: one `IrcClient` per network _Registry already handled it; covered by `test/irc/multi-network.ts`. Open: the `connecting` banner is global._, a `NetworkManager` aggregator dispatching by network UUID. Defer the UI side of "switch which network is active" until you actually need it.
 6. [x] **STS** — cache STS policy per host in localStorage; upgrade `ws://` to `wss://` when policy says so. _Done 2026-08-25: `client/js/irc/sts.ts`; insecure `port=` → one secure reconnect; secure `duration=` cached; connect-time upgrades persisted to the saved network. 14 tests._

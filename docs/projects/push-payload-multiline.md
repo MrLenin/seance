@@ -75,7 +75,8 @@ are dropped (the draft allows it). `<host>` is the sender's displayed host.
   sent", and (message-ids) "Servers MUST only include a message ID on the
   first message of a batch when sending a fallback to non-supporting
   clients". (An earlier revision repeated `msgid=<base>` on every line;
-  upstream review of the server change pointed at that rule.)
+  upstream review of the server change pointed at that rule — nefarious2
+  `fa9c596`.)
 - `time` is the batch's timestamp and `account` the sender's account (when
   logged in, same as §3.1), on every line: "Tags MAY also be included on
   subsequent lines where it makes sense to do so", and for a line that

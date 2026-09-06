@@ -3,6 +3,12 @@
 	<aside class="settings-menu">
 		<h2>Settings</h2>
 		<ul role="navigation" aria-label="Settings tabs">
+			<SettingTabItem
+				v-if="showNetworks"
+				name="Networks"
+				class-name="networks"
+				to="networks"
+			/>
 			<SettingTabItem v-if="showGeneral" name="General" class-name="general" to="" />
 			<SettingTabItem name="Appearance" class-name="appearance" to="appearance" />
 			<SettingTabItem name="Notifications" class-name="notifications" to="notifications" />
@@ -80,6 +86,10 @@
 	content: "\f013"; /* http://fontawesome.io/icon/cog/ */
 }
 
+.settings-menu .networks::before {
+	content: "\f233"; /* https://fontawesome.com/icons/server */
+}
+
 .settings-menu button:hover,
 .settings-menu button.active {
 	color: var(--body-color);
@@ -94,6 +104,7 @@
 import SettingTabItem from "./SettingTabItem.vue";
 import {defineComponent} from "vue";
 import {useStore} from "../../js/store";
+import {brandingFeatures} from "../../js/branding";
 import {shouldShowGeneralSettings} from "../../js/helpers/settingsTabs";
 
 export default defineComponent({
@@ -104,7 +115,11 @@ export default defineComponent({
 	setup() {
 		const store = useStore();
 		const isPublic = store.state.serverConfiguration?.public;
-		return {isPublic, showGeneral: shouldShowGeneralSettings()};
+		return {
+			isPublic,
+			showGeneral: shouldShowGeneralSettings(),
+			showNetworks: brandingFeatures(store.state.branding).saveNetworks,
+		};
 	},
 });
 </script>
