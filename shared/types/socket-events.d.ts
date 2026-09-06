@@ -95,7 +95,13 @@ interface ServerToClientEvents {
 
 	users: EventHandler<{chan: number}>;
 
-	more: EventHandler<{chan: number; messages: SharedMsg[]; totalMessages: number}>;
+	more: EventHandler<{
+		chan: number;
+		messages: SharedMsg[];
+		totalMessages: number;
+		/** Whether older history remains (the server's end tag / page fullness). */
+		moreAvailable?: boolean;
+	}>;
 
 	"msg:preview": EventHandler<{id: number; chan: number; preview: LinkPreview}>;
 	/** A `+draft/react` / `+draft/unreact` TAGMSG resolved to the message it targets. */
