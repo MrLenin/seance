@@ -17,6 +17,7 @@ export function toClientChan(shared: SharedNetworkChan): ClientChan {
 		scrolledToBottom: true,
 		replyTo: null,
 		editing: null,
+		editDismissed: false,
 		typing: [],
 		typingReserved: false,
 		activityUntil: 0,

@@ -215,7 +215,7 @@ describe("Connect burst: batched JOIN, paced catch-up, lazy MODE (irc/catchup.ts
 		expect(h.sent()).to.deep.equal([]);
 	});
 
-	it("uses the reconnect (AFTER) path for channels that already had history", function () {
+	it("uses the reconnect path (LATEST, walking back) for channels that already had history", function () {
 		const h = connected();
 		const seance = h.client.findChannel("#seance")!;
 		h.client.open(seance.id);
@@ -234,7 +234,7 @@ describe("Connect burst: batched JOIN, paced catch-up, lazy MODE (irc/catchup.ts
 		const atRegistration = h.transport.sent.slice(mark);
 		const join = atRegistration.findIndex((l) => l.startsWith("JOIN "));
 		expect(join).to.be.greaterThan(-1);
-		expect(atRegistration[join + 1]).to.match(/CHATHISTORY AFTER #seance msgid=m1 \d+$/);
+		expect(atRegistration[join + 1]).to.match(/CHATHISTORY LATEST #seance \* \d+$/);
 		// The marker is already known from before the drop: not asked again.
 		expect(atRegistration).to.not.include("MARKREAD #seance");
 		h.transport.line(":alice!alice@host JOIN #seance");

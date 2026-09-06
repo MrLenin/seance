@@ -5,13 +5,32 @@ import ForkTsCheckerWebpackPlugin from "fork-ts-checker-webpack-plugin";
 import MiniCssExtractPlugin from "mini-css-extract-plugin";
 import {VueLoaderPlugin} from "vue-loader";
 import babelConfig from "./babel.config.cjs";
+import {execFileSync} from "child_process";
 import {createHash} from "crypto";
 import {readFileSync} from "fs";
 import pkg from "./package.json";
 
-// Short hash of the package version, appended to asset URLs so browsers
-// and the service worker refetch after a release.
-const cacheBust = createHash("sha256").update(`v${pkg.version}`).digest("hex").substring(0, 10);
+function resolveVersion(): string {
+	const releaseVersion = process.env.SEANCE_VERSION?.trim();
+
+	if (releaseVersion) {
+		return releaseVersion.replace(/^v/, "");
+	}
+
+	try {
+		const git = (...args: string[]) => execFileSync("git", args, {encoding: "utf8"}).trim();
+		const tag = git("describe", "--tags", "--abbrev=0").replace(/^v/, "");
+		return `${tag}-${git("rev-parse", "--short=8", "HEAD")}`;
+	} catch {
+		return pkg.version;
+	}
+}
+
+const version = resolveVersion();
+
+// Short hash of the displayed version, appended to asset URLs so browsers
+// and the service worker refetch after a new build.
+const cacheBust = createHash("sha256").update(`v${version}`).digest("hex").substring(0, 10);
 
 // Build-time branding. `client/config.json` is the same file the app fetches
 // at runtime (copied to `public/config.json`); the values below only feed the
@@ -235,6 +254,7 @@ const config: webpack.Configuration = {
 		new webpack.DefinePlugin({
 			__VUE_PROD_DEVTOOLS__: false,
 			__VUE_OPTIONS_API__: false,
+			"process.env.SEANCE_VERSION": JSON.stringify(version),
 		}),
 		miniCssExtractPlugin,
 		new CopyPlugin({
