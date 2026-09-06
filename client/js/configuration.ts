@@ -21,7 +21,7 @@ const configuration: SharedConfiguration = {
 	ldapEnabled: false,
 	isUpdateAvailable: false,
 	applicationServerKey: "",
-	version: pkg.version,
+	version: process.env.SEANCE_VERSION || pkg.version,
 	gitCommit: null,
 	themes: [
 		{name: "default", displayName: "Default", themeColor: null},
