@@ -1,5 +1,6 @@
 import type {TypedStore} from "./store";
 import {mirrorPushPrefs} from "./push-prefs";
+import {normalizeFontSize} from "./helpers/fontSize";
 
 const defaultSettingConfig = {
 	apply() {},
@@ -70,6 +71,16 @@ const defaultConfig = {
 	 * (client/js/webpush.ts, helpers/pushKeys.ts keyChangePolicy). */
 	pushKeyChange: {
 		default: "ask",
+	},
+	// Message text size (the chat area, input and user list). The scale and
+	// its normalization live in helpers/fontSize.ts; the pixel values live in
+	// style.css, keyed off <html data-font-size="...">, so themes and the
+	// custom stylesheet can override them.
+	fontSize: {
+		default: "medium",
+		apply(store: TypedStore, value: string) {
+			document.documentElement.dataset.fontSize = normalizeFontSize(value);
+		},
 	},
 	theme: {
 		default: document.getElementById("theme")?.dataset.serverTheme,
