@@ -85,9 +85,18 @@ export type SharedMsg = {
 	reactions?: MsgReaction[];
 	/** Set when a REDACT for this message arrived; rendered as a placeholder. */
 	redacted?: MsgRedaction;
-	/** msgid of the message this one replaces (`+seance/edit`); rendered as "(edited)". */
+	/**
+	 * msgid of the message this one replaces (`+seance/edit`); rendered as
+	 * "(edited)". When that original is loaded, `msg:edit` moves this
+	 * message into its place and gives it the original's `time`.
+	 */
 	editOf?: string;
-	/** id of the newer message that replaced this one; hidden from the list. */
+	/** When an edit was made (its own `time` before it took the original's). */
+	editedAt?: Date;
+	/**
+	 * id of the newer message that replaced this one, standing right after
+	 * it in the list; hidden from the list.
+	 */
 	supersededBy?: number;
 	previews?: LinkPreview[];
 	/** Sender's services account, from the `account-tag` on PRIVMSG/NOTICE. */

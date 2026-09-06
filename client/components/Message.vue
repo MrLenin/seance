@@ -73,9 +73,7 @@
 					><ParsedMessage :message="message" />
 					<span class="msg-redacted-note">{{ redactedLabel }}</span></span
 				><ParsedMessage v-else :message="message" />
-				<span v-if="message.editOf" class="msg-edited" title="This message was edited"
-					>(edited)</span
-				>
+				<span v-if="message.editOf" class="msg-edited" :title="editedTitle">(edited)</span>
 				<!-- A deleted message hides its previews with its text: the
 				placeholder would otherwise sit above the very image it deleted.
 				Revealing the text brings them back. -->
@@ -153,9 +151,7 @@
 					><ParsedMessage :network="network" :message="message" />
 					<span class="msg-redacted-note">{{ redactedLabel }}</span></span
 				><ParsedMessage v-else :network="network" :message="message" />
-				<span v-if="message.editOf" class="msg-edited" title="This message was edited"
-					>(edited)</span
-				>
+				<span v-if="message.editOf" class="msg-edited" :title="editedTitle">(edited)</span>
 				<!-- A deleted message hides its previews with its text: the
 				placeholder would otherwise sit above the very image it deleted.
 				Revealing the text brings them back. -->
@@ -240,6 +236,13 @@ export default defineComponent({
 
 		const messageTimeLocale = computed(() => {
 			return localetime(props.message.time);
+		});
+
+		// An edit keeps its original's time (msg:edit); when it was made is editedAt.
+		const editedTitle = computed(() => {
+			return props.message.editedAt
+				? `Edited ${localetime(props.message.editedAt)}`
+				: "This message was edited";
 		});
 
 		const messageComponent = computed(() => {
@@ -335,6 +338,7 @@ export default defineComponent({
 			timeFormat,
 			messageTime,
 			messageTimeLocale,
+			editedTitle,
 			messageComponent,
 			isAction,
 			quote,

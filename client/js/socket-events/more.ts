@@ -21,8 +21,10 @@ socket.on("more", async (data) => {
 	channel.inputHistory = channel.inputHistory.concat(
 		extractInputHistory(data.messages, 100 - channel.inputHistory.length)
 	);
+	// Prefer the explicit decision; the arithmetic is the pre-2026-09 fallback
+	// (it counts live rows against the history total, see irc/history.ts).
 	channel.moreHistoryAvailable =
-		data.totalMessages > channel.messages.length + data.messages.length;
+		data.moreAvailable ?? data.totalMessages > channel.messages.length + data.messages.length;
 	channel.messages = data.messages.concat(channel.messages);
 
 	await nextTick();

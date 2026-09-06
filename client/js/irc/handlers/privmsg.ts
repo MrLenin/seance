@@ -212,7 +212,10 @@ function handleMessage(client: IrcClient, msg: IrcMessage, baseType: MessageType
 		settleEcho(client, chan, msg, type, text);
 	}
 
-	const pushed = client.pushMessage(chan, message, !self);
+	// An edit of a loaded message takes that message's place in the list
+	// (`msg:edit`), so it is not a new unread message; a highlight in it
+	// still counts, as `pushMessage` counts every highlight.
+	const pushed = client.pushMessage(chan, message, !self && !editOf);
 
 	if (editOf) {
 		// `msg:edit` must follow the `msg` and carry resolved ids; in a
