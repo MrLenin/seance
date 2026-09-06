@@ -48,19 +48,60 @@ export function cancelCompose(channel: ClientChan) {
 	channel.replyTo = null;
 }
 
-/** Newest own plain message with a msgid that can still be edited. */
-export function findLastEditable(channel: ClientChan): ClientMessage | undefined {
-	for (let i = channel.messages.length - 1; i >= 0; i--) {
-		const m = channel.messages[i];
-
-		if (
-			m.self &&
+/** An own plain message with a msgid that can still be edited. */
+function isEditable(m: ClientMessage): boolean {
+	return Boolean(
+		m.self &&
 			m.msgid &&
 			m.type === MessageType.MESSAGE &&
 			!m.redacted &&
 			m.supersededBy === undefined
-		) {
-			return m;
+	);
+}
+
+function indexOfMessage(channel: ClientChan, message: ClientMessage): number {
+	return channel.messages.findIndex((m) => m.id === message.id);
+}
+
+/** Newest own editable message in the channel (ArrowUp in an empty input). */
+export function findLastEditable(channel: ClientChan): ClientMessage | undefined {
+	for (let i = channel.messages.length - 1; i >= 0; i--) {
+		if (isEditable(channel.messages[i])) {
+			return channel.messages[i];
+		}
+	}
+
+	return undefined;
+}
+
+/** Nearest own editable message older than `message` (ArrowUp while editing). */
+export function findEditableBefore(
+	channel: ClientChan,
+	message: ClientMessage
+): ClientMessage | undefined {
+	for (let i = indexOfMessage(channel, message) - 1; i >= 0; i--) {
+		if (isEditable(channel.messages[i])) {
+			return channel.messages[i];
+		}
+	}
+
+	return undefined;
+}
+
+/** Nearest own editable message newer than `message` (ArrowDown while editing). */
+export function findEditableAfter(
+	channel: ClientChan,
+	message: ClientMessage
+): ClientMessage | undefined {
+	const at = indexOfMessage(channel, message);
+
+	if (at === -1) {
+		return undefined;
+	}
+
+	for (let i = at + 1; i < channel.messages.length; i++) {
+		if (isEditable(channel.messages[i])) {
+			return channel.messages[i];
 		}
 	}
 
