@@ -122,7 +122,13 @@ import {
 import type {ClientNetwork, ClientChan} from "../js/types";
 import {useStore} from "../js/store";
 import {ChanType} from "../../shared/types/chan";
-import {cancelCompose, findLastEditable, startEdit} from "../js/helpers/compose";
+import {
+	cancelCompose,
+	findEditableAfter,
+	findEditableBefore,
+	findLastEditable,
+	startEdit,
+} from "../js/helpers/compose";
 import {hasVirtualKeyboard} from "../js/helpers/device";
 import {TypingReporter} from "../js/helpers/typingReporter";
 import TypingIndicator from "./TypingIndicator.vue";
@@ -206,6 +212,7 @@ export default defineComponent({
 		const setPendingMessage = (e: Event) => {
 			props.channel.pendingMessage = (e.target as HTMLInputElement).value;
 			props.channel.inputHistoryPosition = 0;
+			props.channel.editDismissed = false; // typing re-arms ArrowUp-to-edit
 			setInputSize();
 			reportTyping();
 		};
@@ -477,6 +484,12 @@ export default defineComponent({
 					return;
 				}
 
+				// Escape from an edit hands ArrowUp back to input history
+				// until the user types again (`editDismissed`).
+				if (props.channel.editing) {
+					props.channel.editDismissed = true;
+				}
+
 				cancelCompose(props.channel);
 
 				if (input.value) {
@@ -500,15 +513,18 @@ export default defineComponent({
 				}
 
 				// ArrowUp in an EMPTY input edits your newest own message in this
-				// channel (the usual chat convention). Input history keeps ArrowUp
-				// whenever there is text in the box, when history is already being
-				// browsed, or when there is no own editable message here; Escape
-				// leaves edit mode and empties the input, so a second ArrowUp then
-				// browses history as before.
+				// channel (the usual chat convention); once editing, further
+				// ArrowUp/Down presses step the edit through your own messages
+				// (the editing branch below). Input history keeps ArrowUp whenever
+				// there is text in the box, when history is already being browsed,
+				// or when there is no own editable message here; Escape dismisses
+				// the edit (`editDismissed`, cleared by typing), so ArrowUp after
+				// it browses history instead of re-entering the edit.
 				if (
 					key === "up" &&
 					props.channel.pendingMessage === "" &&
 					props.channel.inputHistoryPosition === 0 &&
+					!props.channel.editDismissed &&
 					!props.channel.editing
 				) {
 					const last = findLastEditable(props.channel);
@@ -528,6 +544,40 @@ export default defineComponent({
 				const totalRows = (input.value.value.match(/\n/g) || []).length;
 
 				const {channel} = props;
+
+				// While editing, ArrowUp/Down move the edit to your previous/next
+				// own editable message instead of browsing input history — but
+				// only while the text is untouched, so an edit in progress is
+				// never thrown away by an arrow key. ArrowDown past the newest
+				// leaves edit mode, back to the empty input ArrowUp started from.
+				if (channel.editing) {
+					if (channel.pendingMessage !== (channel.editing.text ?? "")) {
+						return; // a modified edit: the arrows just move the caret
+					}
+
+					if (key === "up" ? onRow !== 0 : onRow !== totalRows) {
+						return;
+					}
+
+					const next =
+						key === "up"
+							? findEditableBefore(channel, channel.editing)
+							: findEditableAfter(channel, channel.editing);
+
+					if (next) {
+						startEdit(channel, next);
+					} else if (key === "down") {
+						cancelCompose(channel); // past the newest: edit over
+						reportTyping(); // ...which empties the input → `done`
+					} else {
+						return; // already at the oldest own message
+					}
+
+					input.value.value = channel.pendingMessage;
+					setInputSize();
+
+					return false;
+				}
 
 				if (channel.inputHistoryPosition === 0) {
 					channel.inputHistory[channel.inputHistoryPosition] = channel.pendingMessage;

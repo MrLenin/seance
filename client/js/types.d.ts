@@ -34,6 +34,11 @@ type ClientChan = Omit<SharedChan, "messages"> & {
 	replyTo: ClientMessage | null;
 	/** Own message the next plain-text input replaces (`+seance/edit`). */
 	editing: ClientMessage | null;
+	/**
+	 * Escape dismissed an edit: ArrowUp browses input history instead of
+	 * re-entering edit mode, until the user types again.
+	 */
+	editDismissed: boolean;
 	/** Who is typing here right now (`+typing`), pruned by helpers/typingExpiry.ts. */
 	typing: TypingEntry[];
 	/**
