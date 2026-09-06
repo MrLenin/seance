@@ -40,26 +40,31 @@ socket.on("msg:redact", function (data) {
 });
 
 socket.on("msg:edit", function (data) {
-	const message = lookup(data.chan, data.replaces);
-
-	if (message) {
-		applyEdit(message, data.id);
-	}
-
 	const target = store.getters.findChannel(data.chan);
 
-	// If the user was replying to or editing the replaced message, follow the
-	// edit so the compose bar does not point at a hidden message.
-	if (target && message) {
-		const replacement = findMessageById(target.channel.messages, data.id);
+	if (!target) {
+		return;
+	}
 
-		if (target.channel.replyTo === message) {
-			target.channel.replyTo = replacement ?? null;
-		}
+	// The edit takes the original's place in the list; the original is hidden.
+	const placed = applyEdit(target.channel.messages, data.replaces, data.id);
 
-		if (target.channel.editing === message) {
-			target.channel.editing = replacement ?? null;
-		}
+	// A pending copy only stands in until its echo does (`msg:settled` shows
+	// the original again), so the compose bar follows the real replacement
+	// alone. Replying to or editing the replaced message follows the edit,
+	// so the bar does not point at a hidden message.
+	if (!placed || placed.replacement?.pending) {
+		return;
+	}
+
+	const {original, replacement} = placed;
+
+	if (target.channel.replyTo === original) {
+		target.channel.replyTo = replacement ?? null;
+	}
+
+	if (target.channel.editing === original) {
+		target.channel.editing = replacement ?? null;
 	}
 });
 

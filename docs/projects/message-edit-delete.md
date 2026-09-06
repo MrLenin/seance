@@ -15,9 +15,14 @@ Spec: `docs/resources/bus-contract.md` § 1.4; server facts:
   (alias `/delete`) and the trash action in `MessageActions.vue`. `FAIL REDACT <code>` surfaces as an error line.
 - **Edit** — no wire standard. Seance emulates it: `REDACT <chan> <old> :edited`, wait for the echoed REDACT (or FAIL / 5 s timeout), then
   `@+seance/edit=<old msgid> PRIVMSG <chan> :new text`. `client.editMessage()`,
-  `privmsg.ts` sets `msg.editOf`, `msg:edit` hides the old message
-  (`supersededBy`) and the new one shows "(edited)". Pencil action in
-  `MessageActions.vue`; `input` carries an optional `edit` msgid.
+  `privmsg.ts` sets `msg.editOf`, `msg:edit` puts the new message in the
+  old one's place (`helpers/messageUpdates.ts` `applyEdit`: moved behind the
+  original, which is hidden by `supersededBy`; it keeps the original's
+  timestamp and shows "(edited)" with the edit time as its tooltip). Own
+  edits look the same as anyone else's, the pending copy included, and an
+  edit raises no unread count and no notification unless it highlights.
+  Pencil action in `MessageActions.vue`; `input` carries an optional `edit`
+  msgid. Browser check: `tools/scenarios/edit-arrow-step.mjs`.
 - Both are replayed correctly from `draft/chathistory` (`client.afterReplay`).
 
 ## Gaps / decisions

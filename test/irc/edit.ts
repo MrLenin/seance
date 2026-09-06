@@ -59,18 +59,34 @@ describe("Message edits (REDACT + +seance/edit)", function () {
 			// The old message is redacted like any other REDACT of a loaded message.
 			expect(h.payloads<{id: number}>("msg:redact").map((p) => p.id)).to.deep.equal([oldId]);
 
-			// The server echoes the resend: a normal msg with editOf, then msg:edit.
+			// The pending copy of the resend stands in the original's place at
+			// once: its msg is followed by a msg:edit naming the copy.
+			const copy = h.lastMessage(id);
+			expect(copy.pending).to.equal(true);
+			expect(copy.editOf).to.equal("m1");
+			expect(h.payloads<EditPayload>("msg:edit")).to.deep.equal([
+				{chan: id, id: copy.id, replaces: oldId},
+			]);
+
+			// The server echoes the resend: the copy settles, then a normal msg
+			// with editOf, then the msg:edit that puts it in the original's place.
 			h.transport.line(
 				"@+seance/edit=m1;msgid=m2;time=2026-08-25T12:00:02.000Z :alice!alice@host.example PRIVMSG #seance :the text"
 			);
 			const msg = h.lastMessage(id);
 			expect(msg.editOf).to.equal("m1");
 			expect(msg.self).to.equal(true);
+			expect(msg.pending).to.equal(undefined);
+			expect(h.payloads<{id: number}>("msg:settled").map((p) => p.id)).to.deep.equal([
+				copy.id,
+			]);
 			expect(h.payloads<EditPayload>("msg:edit")).to.deep.equal([
+				{chan: id, id: copy.id, replaces: oldId},
 				{chan: id, id: msg.id, replaces: oldId},
 			]);
 			const events = h.events();
-			expect(events.lastIndexOf("msg")).to.be.lessThan(events.indexOf("msg:edit"));
+			expect(events.lastIndexOf("msg:settled")).to.be.lessThan(events.lastIndexOf("msg"));
+			expect(events.lastIndexOf("msg")).to.be.lessThan(events.lastIndexOf("msg:edit"));
 		});
 
 		it("keeps the reply reference on the resend", function () {
@@ -244,6 +260,21 @@ describe("Message edits (REDACT + +seance/edit)", function () {
 			expect(h.payloads<EditPayload>("msg:edit")).to.deep.equal([
 				{chan: id, id: msg.id, replaces: oldId},
 			]);
+		});
+
+		it("does not count another client's edit as unread, but does count a highlight in it", function () {
+			const h = setup();
+			const id = joined(h);
+			const unread = () => h.payloads<{unread: number}>("msg").pop()?.unread;
+			h.transport.line("@msgid=b1 :bob!bob@host PRIVMSG #seance :teh");
+			expect(unread()).to.equal(1);
+
+			h.transport.line("@msgid=b2;+seance/edit=b1 :bob!bob@host PRIVMSG #seance :the");
+			expect(unread()).to.equal(1);
+
+			h.transport.line("@msgid=b3;+seance/edit=b2 :bob!bob@host PRIVMSG #seance :alice: the");
+			expect(h.lastMessage(id).highlight).to.equal(true);
+			expect(unread()).to.equal(2);
 		});
 
 		it("shows the message but no msg:edit when the old one is not loaded", function () {

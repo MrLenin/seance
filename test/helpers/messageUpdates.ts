@@ -36,6 +36,18 @@ describe("Pending messages in the message list (helpers/messageUpdates.ts)", fun
 			expect(ids(messages)).to.deep.equal([1, 4, 2, 3]);
 		});
 
+		it("leaves a copy standing in an edited message's place where it is", function () {
+			// 2 is hidden behind its pending edit 3 (applyEdit): they are the
+			// edited message, not the slot for the next echo.
+			const messages = [msg(1), {...msg(2), supersededBy: 3}, msg(3, true)];
+			insertMessage(messages, msg(4));
+			expect(ids(messages)).to.deep.equal([1, 2, 3, 4]);
+
+			insertMessage(messages, msg(5, true));
+			insertMessage(messages, msg(6));
+			expect(ids(messages)).to.deep.equal([1, 2, 3, 4, 6, 5]);
+		});
+
 		it("only looks at the trailing block", function () {
 			const messages = [msg(1, true), msg(2)];
 			insertMessage(messages, msg(3));
@@ -61,6 +73,19 @@ describe("Pending messages in the message list (helpers/messageUpdates.ts)", fun
 			const messages = [msg(1), msg(2)];
 			expect(removePending(messages, 1)).to.equal(false);
 			expect(ids(messages)).to.deep.equal([1, 2]);
+		});
+
+		it("shows the original again when the copy that stood in for it goes", function () {
+			const messages = [msg(1), {...msg(2), supersededBy: 3}, msg(3, true)];
+			expect(removePending(messages, 3)).to.equal(true);
+			expect(ids(messages)).to.deep.equal([1, 2]);
+			expect(messages[1].supersededBy).to.equal(undefined);
+		});
+
+		it("leaves an original hidden behind something else", function () {
+			const messages = [msg(1), {...msg(2), supersededBy: 9}, msg(3, true)];
+			removePending(messages, 3);
+			expect(messages[1].supersededBy).to.equal(9);
 		});
 
 		it("reports a miss", function () {

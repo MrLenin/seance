@@ -26,7 +26,7 @@
 					:focused="message.id === focused"
 				/>
 				<div
-					v-if="shouldDisplayUnreadMarker(Number(message.id))"
+					v-if="shouldDisplayUnreadMarker(message)"
 					:key="message.id + '-unread'"
 					class="unread-marker"
 				>
@@ -187,8 +187,9 @@ export default defineComponent({
 		});
 
 		// Messages replaced by an edit (`msg:edit`) stay in the store, keyed by
-		// their id for history/reply lookups, but are never rendered. Filtering
-		// here rather than in Message.vue keeps date and unread markers in step.
+		// their id for history/reply lookups, but are never rendered: the edit
+		// stands right behind each of them, in its place. Filtering here rather
+		// than in Message.vue keeps date and unread markers in step.
 		const visibleMessages = computed(() =>
 			props.channel.messages.filter((message) => message.supersededBy === undefined)
 		);
@@ -278,13 +279,19 @@ export default defineComponent({
 			);
 		};
 
-		const shouldDisplayUnreadMarker = (id: number) => {
-			if (!unreadMarkerShown && id > props.channel.firstUnread) {
-				unreadMarkerShown = true;
-				return true;
+		const shouldDisplayUnreadMarker = (message: ClientMessage | CondensedMessageContainer) => {
+			if (unreadMarkerShown || !(Number(message.id) > props.channel.firstUnread)) {
+				return false;
 			}
 
-			return false;
+			// An edit stands where its original stood, whatever its id: it is
+			// never the first unread message, and an edit alone is not news.
+			if ("editOf" in message && message.editOf) {
+				return false;
+			}
+
+			unreadMarkerShown = true;
+			return true;
 		};
 
 		const isPreviousSource = (currentMessage: ClientMessage, id: number) => {

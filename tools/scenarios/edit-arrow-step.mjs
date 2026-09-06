@@ -15,8 +15,10 @@
 // #seance keeps scrollback, so own messages from previous runs sit above
 // this run's three: stepping past this run's oldest legitimately walks
 // into them, which is why nothing here probes "the oldest own message
-// ever". An accepted edit lands as a new row at the bottom (the original
-// is redacted and hidden), so identity is asserted, not position.
+// ever". An accepted edit takes the original's place (the original is
+// redacted and hidden behind it), so step 3 asserts position as well as
+// identity: the edited row stays between its neighbours and keeps the
+// original's timestamp.
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"; // dev ircd's self-signed cert
 
@@ -46,6 +48,10 @@ const COMPOSE = `document.querySelector(".compose-bar .compose-bar-preview")?.te
 const ROWS = `Array.from(document.querySelectorAll("#chat .msg[data-type='message'] .content"))
 	.map((el) => el.textContent.trim())
 	.filter((t) => t.includes("${RUN}"))`;
+// [time, text] of this run's rows, in list order.
+const TIMED_ROWS = `Array.from(document.querySelectorAll("#chat .msg[data-type='message']"))
+	.map((el) => [el.querySelector(".time").textContent.trim(), el.querySelector(".content").textContent.trim()])
+	.filter(([, t]) => t.includes("${RUN}"))`;
 
 export default async function run(page) {
 	await page.goto(page.url, {waitForSelector: "#connect form"});
@@ -66,6 +72,7 @@ export default async function run(page) {
 
 	await page.waitFor(`!document.querySelector("#chat .msg.pending")`, {label: "the echoes"});
 	await page.sleep(300);
+	const timesBefore = await page.evaluate(TIMED_ROWS);
 
 	// 1. ArrowUp steps the edit target: newest, then older — never history.
 	let v = await page.evaluate(press("ArrowUp", 38));
@@ -107,6 +114,28 @@ export default async function run(page) {
 			rows.includes(text("one")) &&
 			rows.includes(text("three"))
 	);
+	// (the edited row's text ends in the "(edited)" marker)
+	const fixedAt = rows.findIndex((t) => t.startsWith(`${text("two")} (fixed)`));
+	await page.check(
+		"the edit stays in its place, between its neighbours",
+		rows.indexOf(text("one")) < fixedAt && fixedAt < rows.indexOf(text("three"))
+	);
+	await page.waitFor(`!document.querySelector("#chat .msg.pending")`, {
+		label: "the edit settled",
+	});
+	const timed = await page.evaluate(TIMED_ROWS);
+	const before = timesBefore.find(([, t]) => t === text("two"));
+	const after = timed.find(([, t]) => t.startsWith(`${text("two")} (fixed)`));
+	await page.check(
+		`the edit keeps the original's timestamp (${before?.[0]} → ${after?.[0]})`,
+		Boolean(before && after) && before[0] === after[0]
+	);
+	const edited = await page.evaluate(
+		`Array.from(document.querySelectorAll("#chat .msg[data-type='message']"))
+			.find((el) => el.querySelector(".content").textContent.includes("${RUN} two (fixed)"))
+			?.querySelector(".msg-edited")?.getAttribute("title") ?? null`
+	);
+	await page.check(`…and says when it was edited (${edited})`, /^Edited \d/.test(edited ?? ""));
 	const barAfterEdit = await page.evaluate(`!!document.querySelector(".compose-bar")`);
 	await page.check("the edit closed the compose bar", !barAfterEdit);
 	await page.screenshot("2-after-edit");
