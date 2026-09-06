@@ -96,7 +96,9 @@ socket.on("msg", function (data) {
 
 	if (data.msg.self) {
 		channel.firstUnread = data.msg.id;
-	} else if (!data.replay) {
+	} else if (!data.replay && (!data.msg.editOf || data.msg.highlight)) {
+		// An edit is not news (it replaces a message in place) unless it
+		// brings a highlight with it.
 		notifyMessage(data.chan, channel, store.state.activeChannel, data.msg);
 	}
 

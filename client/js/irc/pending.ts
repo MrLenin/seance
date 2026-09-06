@@ -123,6 +123,14 @@ export function showPending(
 	registryOf(client).entries.push(entry);
 	client.dispatch("msg", {chan: chan.id, msg});
 
+	// The copy of an edit stands in the original's place, as the echo will
+	// (bus-contract §1.4): the same `msg:edit`, for a copy.
+	const replaces = fields.editOf ? chan.idOf(fields.editOf) : undefined;
+
+	if (replaces !== undefined) {
+		client.dispatch("msg:edit", {chan: chan.id, id: msg.id, replaces});
+	}
+
 	if (arm) {
 		armPending(client, entry);
 	}

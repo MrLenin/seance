@@ -97,10 +97,68 @@ describe("message updates (msg:react / msg:redact / msg:edit)", function () {
 		expect(m.text).to.equal("text 1");
 	});
 
-	it("marks the old message superseded on edit", function () {
-		const old = msg(1);
-		applyEdit(old, 2);
-		expect(old.supersededBy).to.equal(2);
+	describe("applyEdit", function () {
+		const ids = (list: SharedMsg[]) => list.map((m) => m.id);
+
+		it("puts the edit in the original's place, with the original's time", function () {
+			const list = [msg(1), msg(2), msg(3), msg(4, {editOf: "m2"})];
+			const placed = applyEdit(list, 2, 4);
+
+			expect(placed?.original).to.equal(list[1]);
+			expect(placed?.replacement).to.equal(list[2]);
+			expect(ids(list)).to.deep.equal([1, 2, 4, 3]);
+			expect(list[1].supersededBy).to.equal(4);
+			expect(list[2].time).to.deep.equal(new Date(1002));
+			expect(list[2].editedAt).to.deep.equal(new Date(1004));
+			// the original keeps its own time: it is what the edit inherited
+			expect(list[1].time).to.deep.equal(new Date(1002));
+		});
+
+		it("chains: an edit of an edit keeps the first original's time", function () {
+			const list = [msg(1), msg(2), msg(3, {editOf: "m1"})];
+			applyEdit(list, 1, 3);
+			list.push(msg(4, {editOf: "m3"}));
+			applyEdit(list, 3, 4);
+
+			expect(ids(list)).to.deep.equal([1, 3, 4, 2]);
+			expect(list[1].supersededBy).to.equal(4);
+			expect(list[2].time).to.deep.equal(new Date(1001));
+			expect(list[2].editedAt).to.deep.equal(new Date(1004));
+		});
+
+		it("changes nothing on a repeated dispatch", function () {
+			const list = [msg(1), msg(2), msg(3, {editOf: "m1"})];
+			applyEdit(list, 1, 3);
+			applyEdit(list, 1, 3);
+
+			expect(ids(list)).to.deep.equal([1, 3, 2]);
+			expect(list[1].time).to.deep.equal(new Date(1001));
+			expect(list[1].editedAt).to.deep.equal(new Date(1003));
+		});
+
+		it("hides the original even when the replacement is not loaded", function () {
+			const list = [msg(1), msg(2)];
+			const placed = applyEdit(list, 1, 9);
+
+			expect(placed?.original).to.equal(list[0]);
+			expect(placed?.replacement).to.equal(undefined);
+			expect(list[0].supersededBy).to.equal(9);
+			expect(ids(list)).to.deep.equal([1, 2]);
+		});
+
+		it("leaves the edit where it is when the original is not loaded", function () {
+			const list = [msg(1), msg(2, {editOf: "gone"})];
+			expect(applyEdit(list, 9, 2)).to.equal(undefined);
+			expect(ids(list)).to.deep.equal([1, 2]);
+			expect(list[1].editedAt).to.equal(undefined);
+			expect(list[1].time).to.deep.equal(new Date(1002));
+		});
+
+		it("moves a replacement that sits ahead of its original", function () {
+			const list = [msg(3, {editOf: "m1"}), msg(1), msg(2)];
+			applyEdit(list, 1, 3);
+			expect(ids(list)).to.deep.equal([1, 3, 2]);
+		});
 	});
 
 	it("builds reply quotes from loaded parents only", function () {

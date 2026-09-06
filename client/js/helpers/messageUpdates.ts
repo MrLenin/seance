@@ -71,9 +71,69 @@ export function applyRedaction(message: SharedMsg, redaction: MsgRedaction) {
 	};
 }
 
-/** Hide `oldMessage` in favour of the newer message `newId`. */
-export function applyEdit(oldMessage: SharedMsg, newId: number) {
-	oldMessage.supersededBy = newId;
+function indexOfId<T extends SharedMsg>(messages: T[], id: number): number {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		if (messages[i].id === id) {
+			return i;
+		}
+	}
+
+	return -1;
+}
+
+/**
+ * An edit takes its original's place (`msg:edit`). The replacement `id`
+ * arrived as an ordinary `msg`, so it sits at the bottom of the list: it
+ * moves to right behind the original `replaces`, which is hidden behind it,
+ * and it keeps the original's `time` (when the edit was made becomes
+ * `editedAt`), so the message reads as updated where it was — for our own
+ * edits exactly as for anyone else's. The pending copy of an own edit
+ * (bus-contract §1.9) stands in the same way until its echo does.
+ *
+ * Returns what was placed, or undefined when the original is not loaded
+ * (the replacement then stays where its time put it). A replacement that
+ * is not loaded still hides the original.
+ */
+export function applyEdit<T extends SharedMsg>(
+	messages: T[],
+	replaces: number,
+	id: number
+): {original: T; replacement?: T} | undefined {
+	let originalAt = indexOfId(messages, replaces);
+
+	if (originalAt === -1) {
+		return undefined;
+	}
+
+	const original = messages[originalAt];
+	original.supersededBy = id;
+
+	const at = indexOfId(messages, id);
+
+	if (at === -1) {
+		return {original};
+	}
+
+	const replacement = messages[at];
+
+	// Once per message: an edit of an edit inherits the first original's
+	// time through its predecessor, and a repeated dispatch changes nothing.
+	if (replacement.editedAt === undefined) {
+		replacement.editedAt = replacement.time;
+		replacement.time = original.time;
+	}
+
+	if (at !== originalAt + 1) {
+		messages.splice(at, 1);
+
+		if (at < originalAt) {
+			originalAt--;
+		}
+
+		messages.splice(originalAt + 1, 0, replacement);
+	}
+
+	return {original, replacement};
 }
 
 /**
@@ -115,11 +175,17 @@ export function myReactions(message: SharedMsg, nick: string): string[] {
 		.map((reaction) => reaction.text);
 }
 
+/** Whether the message at `index` is an edit standing in its original's place. */
+function standsIn<T extends SharedMsg>(messages: T[], index: number): boolean {
+	return index > 0 && messages[index - 1].supersededBy === messages[index].id;
+}
+
 /**
  * Add a delivered message to a channel's list. Pending copies of our own
  * outgoing messages (bus-contract §1.9) stay a trailing block — the slot
  * their echo will land in — so anything else goes in ahead of that block
- * and a new copy goes after it.
+ * and a new copy goes after it. A copy that stands in an edited message's
+ * place ({@link applyEdit}) is not part of the block: it stays put.
  */
 export function insertMessage<T extends SharedMsg>(messages: T[], msg: T): void {
 	if (msg.pending) {
@@ -129,14 +195,18 @@ export function insertMessage<T extends SharedMsg>(messages: T[], msg: T): void 
 
 	let at = messages.length;
 
-	while (at > 0 && messages[at - 1].pending) {
+	while (at > 0 && messages[at - 1].pending && !standsIn(messages, at - 1)) {
 		at--;
 	}
 
 	messages.splice(at, 0, msg);
 }
 
-/** Take the pending copy `id` out of the list (`msg:settled`). */
+/**
+ * Take the pending copy `id` out of the list (`msg:settled`). An original
+ * the copy stood in for shows again — its echo's `msg:edit`, in the same
+ * tick, hides it behind the real replacement.
+ */
 export function removePending<T extends SharedMsg>(messages: T[], id: number): boolean {
 	for (let i = messages.length - 1; i >= 0; i--) {
 		if (messages[i].id === id) {
@@ -145,6 +215,14 @@ export function removePending<T extends SharedMsg>(messages: T[], id: number): b
 			}
 
 			messages.splice(i, 1);
+
+			for (let j = i - 1; j >= 0; j--) {
+				if (messages[j].supersededBy === id) {
+					messages[j].supersededBy = undefined;
+					break;
+				}
+			}
+
 			return true;
 		}
 	}
