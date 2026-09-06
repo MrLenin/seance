@@ -308,7 +308,7 @@ describe("Message edits (REDACT + +seance/edit)", function () {
 				":irc.test 366 alice #seance :End of /NAMES list."
 			);
 			const sent = h.sent();
-			expect(sent.some((l) => /CHATHISTORY AFTER #seance msgid=b1/.test(l))).to.equal(true);
+			expect(sent.some((l) => /CHATHISTORY LATEST #seance \* \d+$/.test(l))).to.equal(true);
 			batch(
 				h,
 				[

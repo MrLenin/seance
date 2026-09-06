@@ -13,10 +13,19 @@
  *   below everything the channel already shows (`IdAllocator.historyIds`).
  *   A replayed mention keeps `highlight` (the line renders highlighted),
  *   but history never notifies and never counts as unread.
- * - **Catch-up** (re-JOIN after a reconnect): `CHATHISTORY AFTER <newest>`;
- *   the lines are appended as ordinary `msg` events flagged `replay` (shown
- *   with their highlights, but no unread / notification side effects),
- *   paging until a short page. The server
+ * - **Catch-up** (re-JOIN after a reconnect): the spec's own gap-filling
+ *   loop (chathistory.md, "Client pseudocode"): `CHATHISTORY LATEST`, then
+ *   `BEFORE <oldest of the page>` back until a page overlaps what we already
+ *   show (a msgid we hold, or a line older than the newest we had seen
+ *   minus {@link CATCHUP_FUZZ_MS} of clock skew), carries
+ *   `draft/chathistory-end`, comes back short, or the page cap is hit.
+ *   Walking back from the present rather than forward from our newest line
+ *   means the newest messages arrive first and the fill cannot be defeated
+ *   by an anchor the server can no longer see (a presence gap, retention,
+ *   a clock disagreement): it stops where the server's history meets ours.
+ *   The pages are gathered and appended once, oldest first, as ordinary
+ *   `msg` events flagged `replay` (shown with their highlights, but no
+ *   unread / notification side effects). The server
  *   can drive the same thing itself off a `PERSISTENCE ATTACH` cursor, in
  *   which case its `chathistory` batches arrive unasked inside a
  *   `evilnet.github.io/bouncer-replay` wrapper and take the same path
@@ -44,8 +53,11 @@ export const HISTORY_TIMEOUT_MS = 15_000;
 export const MORE_PAGE_SIZE = 100;
 /** Page size for the LATEST request on first JOIN. */
 export const JOIN_PAGE_SIZE = 50;
-/** Most AFTER pages fetched in one catch-up. */
+/** Most pages fetched in one catch-up (LATEST plus BEFORE pages). */
 const MAX_CATCHUP_PAGES = 5;
+/** Clock-skew allowance when deciding a page has reached what we already
+ * held (the spec's FUZZ_INTERVAL, "perhaps 1 to 10 seconds"). */
+export const CATCHUP_FUZZ_MS = 5_000;
 
 export type HistorySubcommand = "LATEST" | "BEFORE" | "AFTER";
 
@@ -59,8 +71,14 @@ export interface HistoryRequest {
 	mode: "prepend" | "append";
 	/** Limit as sent; a reply of this many lines means more may exist. */
 	limit: number;
-	/** Further AFTER pages allowed (append mode). */
+	/** Further BEFORE pages allowed (append mode). */
 	pagesLeft: number;
+	/** Catch-up: the newest message the previous session saw; the walk back stops on reaching it. */
+	floor?: MsgRef;
+	/** Catch-up: the gap gathered so far, oldest first (pages arrive newest first). */
+	gap: SharedMsg[];
+	/** Catch-up: post-delivery work of the gathered pages, in the same order. */
+	gapAfter: (() => void)[];
 	timer: ReturnType<typeof setTimeout>;
 }
 
@@ -120,6 +138,7 @@ export interface HistorySpec {
 	limit: number;
 	mode: "prepend" | "append";
 	pagesLeft?: number;
+	floor?: MsgRef;
 }
 
 /**
@@ -163,6 +182,9 @@ export function requestHistory(
 		mode: spec.mode,
 		limit,
 		pagesLeft: spec.pagesLeft ?? 0,
+		floor: spec.floor,
+		gap: [],
+		gapAfter: [],
 		timer: setTimeout(() => resolve(client, request, null, "timeout"), HISTORY_TIMEOUT_MS),
 	};
 	pendingOf(client).push(request);
@@ -210,9 +232,10 @@ export function requestMore(client: IrcClient, chan: Channel, lastId: number): b
 /**
  * Our JOIN was confirmed: fill the channel. First time round that is the
  * latest {@link JOIN_PAGE_SIZE} messages; after a reconnect (history was
- * loaded before and we know the newest message) it is everything AFTER
- * that message, appended as live messages. `before` is the channel's newest
- * reference as it was before the JOIN line itself was pushed.
+ * loaded before and we know the newest message) it is the gap between that
+ * message and now, gathered from LATEST backwards (see the header) and
+ * appended as live messages. `before` is the channel's newest reference as
+ * it was before the JOIN line itself was pushed.
  */
 export function requestChannelHistory(
 	client: IrcClient,
@@ -221,11 +244,11 @@ export function requestChannelHistory(
 ): HistoryRequest | undefined {
 	if (chan.historyRequested && before) {
 		return requestHistory(client, chan, {
-			subcommand: "AFTER",
-			ref: before,
+			subcommand: "LATEST",
 			limit: MORE_PAGE_SIZE,
 			mode: "append",
 			pagesLeft: MAX_CATCHUP_PAGES - 1,
+			floor: before,
 		});
 	}
 
@@ -382,7 +405,8 @@ function resolve(
 	client: IrcClient,
 	request: HistoryRequest,
 	lines: IrcMessage[] | null,
-	outcome: Outcome
+	outcome: Outcome,
+	end = false
 ): void {
 	const pending = pendingOf(client);
 	const idx = pending.indexOf(request);
@@ -400,19 +424,63 @@ function resolve(
 	const fullPage = lines !== null && lines.length >= request.limit;
 
 	if (request.mode === "append") {
-		deliverAppend(client, chan, messages);
-		runAfter(after);
+		// The spec's loop: this page reached what we already hold when it
+		// carries a msgid we show (replay dropped that line, so look at the
+		// raw page) or a line older than the previous session's newest
+		// minus the skew allowance. An empty page, the end tag, a short
+		// page, the page cap, or a page without timestamps also stop it.
+		const page = lines ?? [];
+		const known = new Set(chan.msgids);
+		const floorMs = request.floor ? request.floor.time.getTime() - CATCHUP_FUZZ_MS : undefined;
+		let reached = page.length === 0;
+		let oldest: MsgRef | undefined;
 
-		if (fullPage && request.pagesLeft > 0 && chan.newestRef) {
-			requestHistory(client, chan, {
-				subcommand: "AFTER",
-				ref: chan.newestRef,
+		for (const line of page) {
+			const msgid = line.tags.get("msgid");
+			const stamp = line.tags.get("time");
+			const time = stamp ? new Date(stamp) : undefined;
+
+			if (msgid && known.has(msgid)) {
+				reached = true;
+			}
+
+			if (time && !Number.isNaN(time.getTime())) {
+				if (floorMs !== undefined && time.getTime() < floorMs) {
+					reached = true;
+				}
+
+				if (!oldest || time < oldest.time) {
+					oldest = {msgid, time};
+				}
+			}
+		}
+
+		// Pages arrive newest first; keep the gathered gap oldest first.
+		request.gap.unshift(...messages);
+		request.gapAfter.unshift(...after);
+
+		if (!reached && !end && fullPage && request.pagesLeft > 0 && oldest) {
+			const next = requestHistory(client, chan, {
+				subcommand: "BEFORE",
+				ref: oldest,
 				limit: request.limit,
 				mode: "append",
 				pagesLeft: request.pagesLeft - 1,
+				floor: request.floor,
 			});
+
+			if (next) {
+				next.gap = request.gap;
+				next.gapAfter = request.gapAfter;
+				return;
+			}
 		}
 
+		// Done (or the next page could not be asked for): deliver what we
+		// gathered, in order. A FAIL or timeout mid-walk still lands the
+		// newer pages already received.
+		deliverAppend(client, chan, request.gap);
+		runAfter(request.gapAfter);
 		return;
 	}
 
@@ -438,7 +506,7 @@ export const chathistoryBatch: BatchHandler = (client, batch) => {
 	const request = findRequest(client, label, target ? [target] : []);
 
 	if (request) {
-		resolve(client, request, batch.messages, "batch");
+		resolve(client, request, batch.messages, "batch", batch.tags.has("draft/chathistory-end"));
 		return;
 	}
 
@@ -461,7 +529,7 @@ export const chathistoryBatch: BatchHandler = (client, batch) => {
 
 /**
  * One inner batch of the server-driven catch-up (persistence.ts): appended
- * like the AFTER pages of our own catch-up — highlights kept but silent
+ * like the gathered pages of our own catch-up — highlights kept but silent
  * (`replay`), no unread, msgid dedupe against what the channel already shows. A PM from someone we have
  * no window for opens one, as a live message would.
  */

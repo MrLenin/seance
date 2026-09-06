@@ -183,7 +183,7 @@ describe("Session persistence and quiet re-joins (irc/persistence.ts)", function
 			expect(sent.filter((l) => l.includes("#other"))).to.deep.equal(["JOIN #other"]);
 		});
 
-		it("a drop and a resumed session: nothing is shown, history is fetched AFTER the newest line", function () {
+		it("a drop and a resumed session: nothing is shown, history is fetched from LATEST back to the newest line", function () {
 			const h = setup();
 			const seance = h.client.findChannel("#seance")!;
 			h.client.open(seance.id);
@@ -210,7 +210,7 @@ describe("Session persistence and quiet re-joins (irc/persistence.ts)", function
 			expect(h.messages(seance.id)).to.deep.equal([]);
 			expect(h.sent().filter((l) => !l.startsWith("MODE"))).to.have.length(1);
 			expect(h.transport.sent[h.transport.sent.length - 2]).to.match(
-				/CHATHISTORY AFTER #seance (msgid|timestamp)=\S+ \d+$/
+				/CHATHISTORY LATEST #seance \* \d+$/
 			);
 			expect(h.transport.sent.filter((l) => l.startsWith("JOIN"))).to.deep.equal([]);
 		});

@@ -482,7 +482,7 @@ describe("PERSISTENCE ATTACH catch-up cursor (irc/persistence.ts)", function () 
 			expect(h.client.serverReplay).to.equal(false);
 			expect(chathistory(h.sent())).to.have.length(1);
 			expect(h.transport.sent[h.transport.sent.length - 2]).to.match(
-				/CHATHISTORY AFTER #seance msgid=m1 \d+$/
+				/CHATHISTORY LATEST #seance \* \d+$/
 			);
 		});
 

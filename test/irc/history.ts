@@ -214,13 +214,14 @@ function labelOf(line: string | undefined): string | undefined {
 function batch(
 	h: Harness,
 	lines: string[],
-	opts: {ref?: string; target?: string; label?: string} = {}
+	opts: {ref?: string; target?: string; label?: string; end?: boolean} = {}
 ): void {
 	const ref = opts.ref ?? "hist1";
 	const target = opts.target ?? "#seance";
-	h.transport.line(
-		`${opts.label ? `@label=${opts.label} ` : ""}:irc.test BATCH +${ref} chathistory ${target}`
-	);
+	const tags = [opts.label ? `label=${opts.label}` : "", opts.end ? "draft/chathistory-end" : ""]
+		.filter(Boolean)
+		.join(";");
+	h.transport.line(`${tags ? `@${tags} ` : ""}:irc.test BATCH +${ref} chathistory ${target}`);
 
 	for (const line of lines) {
 		h.transport.line(
@@ -241,9 +242,15 @@ function joined(h: Harness, lines: string[] = []): number {
 }
 
 /** Answer whatever request `sentLines` contains. */
-function reply(h: Harness, sentLines: string[], lines: string[], target?: string): void {
+function reply(
+	h: Harness,
+	sentLines: string[],
+	lines: string[],
+	target?: string,
+	end = false
+): void {
 	const label = labelOf(sentLines.find((l) => l.includes("CHATHISTORY")));
-	batch(h, lines, {label, target});
+	batch(h, lines, {label, target, end});
 }
 
 function hist(n: number, nick = "bob", text = `message ${n}`): string {
@@ -796,7 +803,7 @@ describe("Chat history (history.ts)", function () {
 			return h.sent();
 		}
 
-		it("asks for messages AFTER the newest one seen and appends them without unread effects", function () {
+		it("fills the gap from LATEST back to the newest message seen, appended in order without unread effects", function () {
 			const h = setup();
 			const id = joined(h);
 			const chan = h.client.findChannel("#seance")!;
@@ -809,12 +816,16 @@ describe("Chat history (history.ts)", function () {
 			const sent = reconnect(h);
 			// (Our own JOIN line is a `self` message, which resets the counter.)
 			const unreadBefore = chan.shared.unread;
+			// The spec's loop starts from the present, not from our anchor.
 			expect(sent.find((l) => l.includes("CHATHISTORY"))).to.match(
-				/CHATHISTORY AFTER #seance msgid=last-seen 100$/
+				/CHATHISTORY LATEST #seance \* 100$/
 			);
 			expect(pendingHistory(h.client)[0]).to.include({mode: "append"});
 
+			// The page reaches back past what we hold (last-seen is in it):
+			// the walk stops here, and the known line is not shown twice.
 			reply(h, sent, [
+				"@time=2026-08-25T12:10:00.000Z;msgid=last-seen :bob!bob@host PRIVMSG #seance :before the drop",
 				"@time=2026-08-25T12:15:00.000Z;msgid=gap-1 :bob!bob@host PRIVMSG #seance :alice you there?",
 				"@time=2026-08-25T12:16:00.000Z;msgid=gap-2 :bob!bob@host PRIVMSG #seance :guess not",
 			]);
@@ -822,6 +833,7 @@ describe("Chat history (history.ts)", function () {
 			expect(mores(id)).to.have.length(0);
 			const gap = msgs(id).filter((p) => p.msg.msgid?.startsWith("gap"));
 			expect(gap.map((p) => p.msg.text)).to.deep.equal(["alice you there?", "guess not"]);
+			expect(msgs(id).filter((p) => p.msg.msgid === "last-seen")).to.have.length(0);
 			// The mention renders highlighted; the replay flag keeps the
 			// consumer from notifying, and no counters move.
 			expect(gap.map((p) => p.msg.highlight)).to.deep.equal([true, false]);
@@ -831,9 +843,10 @@ describe("Chat history (history.ts)", function () {
 			expect(chan.shared.highlight).to.equal(0);
 			expect(chan.newestRef?.msgid).to.equal("gap-2");
 			expect(pendingHistory(h.client)).to.have.length(0);
+			expect(h.sent().filter((l) => l.includes("CHATHISTORY"))).to.deep.equal([]);
 		});
 
-		it("pages AFTER again while the server returns full pages", function () {
+		it("pages BEFORE while pages are full and the gap is not yet closed, then appends oldest first", function () {
 			const h = setup({isupport: "CHATHISTORY=2 MSGREFTYPES=timestamp,msgid"});
 			const id = joined(h);
 			h.transport.line(
@@ -841,22 +854,106 @@ describe("Chat history (history.ts)", function () {
 			);
 
 			const sent = reconnect(h, "CHATHISTORY=2 MSGREFTYPES=timestamp,msgid");
-			expect(sent.find((l) => l.includes("CHATHISTORY"))).to.match(
-				/AFTER #seance msgid=seen 2$/
-			);
+			expect(sent.find((l) => l.includes("CHATHISTORY"))).to.match(/LATEST #seance \* 2$/);
+			// Newest page: full, nothing we hold, nothing older than the floor.
 			reply(h, sent, [
-				"@time=2026-08-25T12:15:00.000Z;msgid=g1 :bob!bob@host PRIVMSG #seance :one",
 				"@time=2026-08-25T12:16:00.000Z;msgid=g2 :bob!bob@host PRIVMSG #seance :two",
+				"@time=2026-08-25T12:17:00.000Z;msgid=g3 :bob!bob@host PRIVMSG #seance :three",
 			]);
+			// Nothing shown yet: the gap is delivered whole, in order.
+			expect(msgs(id).map((p) => p.msg.text)).to.not.include.members(["two", "three"]);
 
 			const next = h.sent();
-			expect(next[0]).to.match(/CHATHISTORY AFTER #seance msgid=g2 2$/);
+			expect(next[0]).to.match(/CHATHISTORY BEFORE #seance msgid=g2 2$/);
+			// This page overlaps what we hold: the walk ends.
 			reply(h, next, [
-				"@time=2026-08-25T12:17:00.000Z;msgid=g3 :bob!bob@host PRIVMSG #seance :three",
+				"@time=2026-08-25T12:10:00.000Z;msgid=seen :bob!bob@host PRIVMSG #seance :x",
+				"@time=2026-08-25T12:15:00.000Z;msgid=g1 :bob!bob@host PRIVMSG #seance :one",
 			]);
 
 			expect(h.sent()).to.deep.equal([]);
-			expect(msgs(id).map((p) => p.msg.text)).to.include.members(["one", "two", "three"]);
+			const texts = msgs(id).map((p) => p.msg.text);
+			expect(texts.slice(-3)).to.deep.equal(["one", "two", "three"]);
+			// The line we already held is not replayed.
+			expect(msgs(id).filter((p) => p.msg.msgid === "seen")).to.have.length(0);
+			expect(pendingHistory(h.client)).to.have.length(0);
+		});
+
+		it("stops on draft/chathistory-end even when the page is full", function () {
+			const h = setup({isupport: "CHATHISTORY=2 MSGREFTYPES=timestamp,msgid"});
+			const id = joined(h);
+			h.transport.line(
+				"@msgid=seen;time=2026-08-25T12:10:00.000Z :bob!bob@host PRIVMSG #seance :x"
+			);
+
+			const sent = reconnect(h, "CHATHISTORY=2 MSGREFTYPES=timestamp,msgid");
+			reply(
+				h,
+				sent,
+				[
+					"@time=2026-08-25T12:16:00.000Z;msgid=g2 :bob!bob@host PRIVMSG #seance :two",
+					"@time=2026-08-25T12:17:00.000Z;msgid=g3 :bob!bob@host PRIVMSG #seance :three",
+				],
+				undefined,
+				true
+			);
+
+			expect(h.sent()).to.deep.equal([]);
+			expect(
+				msgs(id)
+					.map((p) => p.msg.text)
+					.slice(-2)
+			).to.deep.equal(["two", "three"]);
+		});
+
+		it("stops when a page is older than the newest message seen, within the skew allowance", function () {
+			const h = setup({isupport: "CHATHISTORY=2 MSGREFTYPES=timestamp,msgid"});
+			const id = joined(h);
+			h.transport.line(
+				"@msgid=seen;time=2026-08-25T12:10:00.000Z :bob!bob@host PRIVMSG #seance :x"
+			);
+
+			const sent = reconnect(h, "CHATHISTORY=2 MSGREFTYPES=timestamp,msgid");
+			// The server no longer shows us `seen` (aged out, or a presence
+			// gap): the page skips it, but a line older than the floor still
+			// proves the walk has reached our history.
+			reply(h, sent, [
+				"@time=2026-08-25T12:09:00.000Z;msgid=older :bob!bob@host PRIVMSG #seance :older",
+				"@time=2026-08-25T12:15:00.000Z;msgid=g1 :bob!bob@host PRIVMSG #seance :one",
+			]);
+
+			expect(h.sent()).to.deep.equal([]);
+			expect(
+				msgs(id)
+					.map((p) => p.msg.text)
+					.slice(-2)
+			).to.deep.equal(["older", "one"]);
+		});
+
+		it("delivers the pages already gathered when a later one fails", function () {
+			const h = setup({isupport: "CHATHISTORY=2 MSGREFTYPES=timestamp,msgid"});
+			const id = joined(h);
+			h.transport.line(
+				"@msgid=seen;time=2026-08-25T12:10:00.000Z :bob!bob@host PRIVMSG #seance :x"
+			);
+
+			const sent = reconnect(h, "CHATHISTORY=2 MSGREFTYPES=timestamp,msgid");
+			reply(h, sent, [
+				"@time=2026-08-25T12:16:00.000Z;msgid=g2 :bob!bob@host PRIVMSG #seance :two",
+				"@time=2026-08-25T12:17:00.000Z;msgid=g3 :bob!bob@host PRIVMSG #seance :three",
+			]);
+			const next = h.sent();
+			const label = labelOf(next[0]);
+			h.transport.line(
+				`@label=${label} :irc.test FAIL CHATHISTORY MESSAGE_ERROR BEFORE #seance :Messages could not be retrieved`
+			);
+
+			expect(
+				msgs(id)
+					.map((p) => p.msg.text)
+					.slice(-2)
+			).to.deep.equal(["two", "three"]);
+			expect(pendingHistory(h.client)).to.have.length(0);
 		});
 
 		it("uses LATEST on a re-JOIN when no history was ever loaded", function () {
