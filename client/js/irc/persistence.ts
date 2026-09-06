@@ -13,7 +13,8 @@
  *
  * - the replayed JOIN / topic / NAMES update the model without producing
  *   lines (`IrcClient.restoring`, honoured by join.ts and topic.ts) and each
- *   restored JOIN starts the usual paced `CHATHISTORY AFTER` catch-up
+ *   restored JOIN starts the usual paced catch-up (`CHATHISTORY LATEST`, then
+ *   `BEFORE` back to the newest line we held; history.ts)
  *   (catchup.ts), which is what actually fills the gap — unless the server
  *   is filling it itself, see {@link serverReplayCovers};
  * - after `STATUS ON` the autojoin `JOIN` waits for that batch (or
@@ -328,7 +329,7 @@ export function isRoutineReplayNotice(client: IrcClient, msg: IrcMessage): boole
 
 /**
  * True when the server's cursor replay already covers this JOIN's gap, so
- * the per-channel `CHATHISTORY AFTER` (catchup.ts) would only ask for what
+ * the per-channel catch-up walk (catchup.ts) would only ask for what
  * is already on its way. That is the point of the cursor: one server-driven
  * batch instead of `TARGETS` + N × `CHATHISTORY`.
  *

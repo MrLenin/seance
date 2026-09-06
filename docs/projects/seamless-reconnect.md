@@ -58,7 +58,7 @@ drop showed the same join/topic lines as well.
   The batch is run through the normal handlers with `client.restoring` set:
   JOIN/332/333/NAMES update the model, show nothing (a topic we did not
   know yet — fresh page load — is still shown), and each restored JOIN
-  starts the usual paced catch-up (`CHATHISTORY AFTER` the newest line we
+  starts the usual paced catch-up (`CHATHISTORY LATEST`, then `BEFORE` back to the newest line we
   hold). Afterwards only the channels the server did _not_ restore are
   JOINed. `STATUS OFF`, no STATUS, or no cap: JOIN at 376 as before. A
   `PERSISTENCE` reply the user asked for (`/persistence status`) is shown in
@@ -118,7 +118,7 @@ server does not announce, so the rule is now about the _content_:
 ## Round three: the server does the catch-up (2026-08-28)
 
 `PERSISTENCE ATTACH <profile> [<msgid>]` (nefarious2 `9bc57d4`) replaces our
-`TARGETS` + N × `CHATHISTORY AFTER` with one server-driven replay. What the
+`TARGETS` + N × `CHATHISTORY` (LATEST then BEFORE, the spec's gap-filling loop) with one server-driven replay. What the
 client does now:
 
 - **Track the cursor.** `IrcClient.cursor` is the newest msgid we have shown
@@ -153,7 +153,7 @@ client does now:
   prepending it as older history, deduplicating on msgid against what the
   channel already shows. A PM from someone we have no window for opens one.
 - **Stand down.** With the cursor accepted, a channel the server restores
-  does not get a `CHATHISTORY AFTER` of its own (`persistence.ts`
+  does not get a catch-up walk of its own (`persistence.ts`
   `serverReplayCovers`, consulted by `IrcClient.handleMessage` before
   `enqueueCatchup`): that is exactly what the cursor replaces. A channel this
   page load holds nothing for still gets its `CHATHISTORY LATEST` fill — the
