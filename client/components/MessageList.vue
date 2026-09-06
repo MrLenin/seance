@@ -130,6 +130,15 @@ export default defineComponent({
 				return;
 			}
 
+			// The observer fires this directly, past the button's :disabled: a
+			// scroll that takes the button out of view and back mid-load must
+			// not put a second request in flight (the first reply then cleared
+			// historyLoading under the second, whose prepend skipped the scroll
+			// compensation and pinned the view to the top).
+			if (props.channel.historyLoading) {
+				return;
+			}
+
 			let lastMessage = -1;
 
 			// Find the id of first message that isn't showInActive
@@ -296,7 +305,7 @@ export default defineComponent({
 			}
 		};
 
-		const keepScrollPosition = async () => {
+		const keepScrollPosition = async (prepended = false) => {
 			// If we are already waiting for the next tick to force scroll position,
 			// we have no reason to perform more checks and set it again in the next tick
 			if (isWaitingForNextTick.value) {
@@ -310,7 +319,9 @@ export default defineComponent({
 			}
 
 			if (!props.channel.scrolledToBottom) {
-				if (props.channel.historyLoading) {
+				// Rows inserted at the head must always be compensated, whether
+				// or not this component set historyLoading for them.
+				if (props.channel.historyLoading || prepended) {
 					const heightOld = el.scrollHeight - el.scrollTop;
 
 					isWaitingForNextTick.value = true;
@@ -391,8 +402,18 @@ export default defineComponent({
 
 		watch(
 			() => props.channel.messages,
-			async () => {
-				await keepScrollPosition();
+			async (messages, previous) => {
+				// A history page replaces the array with older rows in front
+				// (socket-events/more.ts); a live message mutates it in place.
+				// Head insertion: replaced, longer, and the old head is still
+				// there at the delta.
+				const delta = previous ? messages.length - previous.length : 0;
+				const prepended =
+					!!previous &&
+					messages !== previous &&
+					delta > 0 &&
+					messages[delta] === previous[0];
+				await keepScrollPosition(prepended);
 			},
 			{
 				deep: true,

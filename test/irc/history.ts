@@ -589,7 +589,12 @@ describe("Chat history (history.ts)", function () {
 			);
 
 			expect(mores(id)).to.deep.equal([
-				{chan: id, messages: [], totalMessages: chan.shared.totalMessages},
+				{
+					chan: id,
+					messages: [],
+					totalMessages: chan.shared.totalMessages,
+					moreAvailable: false,
+				},
 			]);
 			expect(pendingHistory(h.client)).to.have.length(0);
 			const shown = msgs(h.client.lobby.id).slice(-1)[0].msg;
@@ -621,7 +626,12 @@ describe("Chat history (history.ts)", function () {
 			clock.tick(1);
 
 			expect(mores(id)).to.deep.equal([
-				{chan: id, messages: [], totalMessages: chan.shared.totalMessages + 1},
+				{
+					chan: id,
+					messages: [],
+					totalMessages: chan.shared.totalMessages + 1,
+					moreAvailable: true,
+				},
 			]);
 			expect(pendingHistory(h.client)).to.have.length(0);
 

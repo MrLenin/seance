@@ -385,9 +385,15 @@ function deliverPrepend(
 	}
 
 	chan.shared.totalMessages += messages.length;
-	// socket-events/more.ts: moreHistoryAvailable = totalMessages > shown + new.
+	// `moreAvailable` is the decision (end tag / full page / retryable
+	// timeout); it used to travel as totalMessages+1 and be re-derived by
+	// comparing against the CURRENT row count, which already holds live
+	// rows (the JOIN echo, a topic) -- 51 > 2 + 50 is false, so a full
+	// first page of a large channel hid the button and scrollback was never
+	// offered; under overlapping requests the running total drifted the
+	// other way. Send the boolean; totalMessages stays for other readers.
 	const totalMessages = chan.shared.totalMessages + (moreAvailable ? 1 : 0);
-	client.dispatch("more", {chan: chan.id, messages, totalMessages});
+	client.dispatch("more", {chan: chan.id, messages, totalMessages, moreAvailable});
 }
 
 /** Append catch-up messages as live ones, without unread / notification effects. */
