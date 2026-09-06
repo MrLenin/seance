@@ -113,6 +113,7 @@ export default async function run(page) {
 | `sleep(ms)`                                |                                                                                        |
 | `consoleLogs`, `consoleErrors`, `wsFrames` | collected since launch; a frame has `dir`, `requestId` (one per socket), `payloadData` |
 | `send(method, params)`                     | raw CDP, for anything not wrapped                                                      |
+| `expectWsErrors`                           | set true while dials are refused on purpose (a failed dial is otherwise a failure)     |
 
 ### Rules that keep a scenario honest
 

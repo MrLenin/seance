@@ -5,6 +5,17 @@
  * capped exponential backoff + jitter; `probe()` for sockets the OS may have killed
  * silently. Nothing else is interpreted — parsing, CAP, ISUPPORT etc. live above this. Uses only the global `WebSocket` (browsers,
  * Node >= 22); inject a constructor via `WebSocketImpl` for tests.
+ *
+ * The retry schedule spaces *automatic* retries. Anything that asks for a
+ * connection from outside — `connect()` from the foreground poke or a click,
+ * `redial()`, a socket lost while `probe()` was waiting for the answer —
+ * restarts it: the user is at the screen, and the delay that had built up
+ * while the app was away (up to the cap) is not theirs to wait out. A
+ * connection that stayed up past STABLE_CONNECTION_MS restarts it too.
+ * Waits at the cap never fall under three quarters of it: nefarious2's
+ * IPcheck refuses the fourth connection from an address when each gap is
+ * 40 s or less (IPCHECK_CLONE_LIMIT / _PERIOD) and a refusal renews the
+ * window, so a cadence under 40 s could never get back in.
  */
 
 export interface ReconnectOptions {
@@ -91,12 +102,23 @@ export class WsTransport {
 		return () => void this.listeners.delete(listener);
 	}
 
-	/** Open the socket. No-op while connecting/open; in reconnect-wait it retries now. */
+	/**
+	 * Open the socket. No-op while connecting/open; in reconnect-wait it
+	 * retries now. A request from outside restarts the retry schedule: if
+	 * this dial fails, the next wait is the first delay, not the one the
+	 * automatic retries had worked up to.
+	 */
 	connect(): void {
 		if (this._state === "connecting" || this._state === "open") {
 			return;
 		}
 
+		this.attempt = 0;
+		this.dial();
+	}
+
+	/** Open the socket now, on whatever attempt count the schedule is at. */
+	private dial(): void {
 		this.clearTimer();
 		this.closedByUs = false;
 		const Impl = this.opts.WebSocketImpl ?? globalThis.WebSocket;
@@ -232,6 +254,31 @@ export class WsTransport {
 		this.connect();
 	}
 
+	/**
+	 * Give up on the current socket (open or still dialling) without giving
+	 * up on the connection: it is closed and reported as lost — close code
+	 * 1006 with `reason` — and the usual reconnect follows. For a caller
+	 * that must not go on with this socket (a SASL exchange that timed out)
+	 * but has no reason to stay down. No-op unless connecting or open.
+	 */
+	abandon(reason: string): void {
+		if (this._state !== "connecting" && this._state !== "open") {
+			return;
+		}
+
+		const ws = this.ws;
+
+		this.ws = null; // its late events are ignored
+
+		try {
+			ws?.close();
+		} catch (err: unknown) {
+			// a socket that never opened may refuse to close; nothing to do
+		}
+
+		this.handleClosed(1006, reason, false);
+	}
+
 	/** Close deliberately: no reconnect is scheduled for this closure. */
 	close(code = 1000, reason = ""): void {
 		this.closedByUs = true;
@@ -290,15 +337,18 @@ export class WsTransport {
 		this.clearProbe();
 		this.clearConnectTimer();
 
-		// A connection that stayed up resets the backoff — and its loss earns
-		// one immediate retry too: that is a phone coming back from the
-		// background (or a proxy hiccup), not a server refusing us, and the
-		// usual first delay is a second spent staring at the screen. A retry
-		// that fails backs off from there as before.
+		// A connection that stayed up restarts the schedule — and so does
+		// the probe, whatever the count had reached: a phone whose
+		// connections are each shorter than the stable mark would otherwise
+		// never see it reset. Either loss earns one immediate retry: that is
+		// a phone coming back from the background (or a proxy hiccup), not a
+		// server refusing us, and the usual first delay is a second spent
+		// staring at the screen. A retry that fails backs off from there.
 		const wasStable =
 			this.openedAt !== null && Date.now() - this.openedAt >= STABLE_CONNECTION_MS;
+		const atOnce = wasStable || probing;
 
-		if (wasStable) {
+		if (atOnce) {
 			this.attempt = 0;
 		}
 
@@ -309,7 +359,7 @@ export class WsTransport {
 		if (retry) {
 			delayMs = this.nextDelay(); // counts the attempt either way
 
-			if ((wasStable || probing) && this.attempt === 1) {
+			if (atOnce) {
 				delayMs = 0;
 			}
 		}
@@ -323,17 +373,21 @@ export class WsTransport {
 			this.timer = setTimeout(() => {
 				this.timer = null;
 				this.emit({type: "retry", attempt: this.attempt});
-				this.connect();
+				this.dial();
 			}, delayMs);
 		}
 	}
 
-	/** Exponential backoff; jitter picks uniformly from [base/2, base]. */
+	/**
+	 * Exponential backoff; jitter picks uniformly from [3/4 base, base] —
+	 * the floor keeps a wait at the 60 s cap above the 40 s clone window
+	 * of nefarious2's IPcheck (see the header).
+	 */
 	private nextDelay(): number {
 		const rc = this.opts.reconnect;
 		this.attempt = Math.min(this.attempt + 1, MAX_ATTEMPTS);
 		const base = Math.min(rc.maxDelayMs, rc.initialDelayMs * rc.factor ** (this.attempt - 1));
-		return Math.round(rc.jitter ? base * (0.5 + Math.random() / 2) : base);
+		return Math.round(rc.jitter ? base * (0.75 + Math.random() / 4) : base);
 	}
 
 	private clearTimer(): void {

@@ -20,6 +20,7 @@ class FakeTransport implements Transport {
 	state: TransportState = "closed";
 	sent: string[] = [];
 	closeCalls = 0;
+	abandonCalls: string[] = [];
 	private listeners: ((ev: TransportEvent) => void)[] = [];
 
 	on(listener: (ev: TransportEvent) => void): () => void {
@@ -45,6 +46,21 @@ class FakeTransport implements Transport {
 	close(): void {
 		this.closeCalls++;
 		this.state = "closed";
+	}
+
+	/** What WsTransport.abandon() does: a lost-connection close, then the schedule. */
+	abandon(reason: string): void {
+		this.abandonCalls.push(reason);
+		this.state = "reconnect-wait";
+		this.emit({
+			type: "close",
+			code: 1006,
+			reason,
+			wasClean: false,
+			willReconnect: true,
+			delayMs: 1000,
+		});
+		this.emit({type: "reconnecting", attempt: 1, delayMs: 1000});
 	}
 
 	open(): void {
@@ -395,7 +411,9 @@ describe("IrcClient SASL", function () {
 		}
 	});
 
-	it("drops the connection when the exchange times out", function () {
+	it("QUITs and retries when the exchange times out: the server, not the login, is the problem", function () {
+		// A phone coming back to a slow services link must not be left
+		// disconnected for good; it also must not register unauthenticated.
 		const clock = sinon.useFakeTimers();
 
 		try {
@@ -408,7 +426,21 @@ describe("IrcClient SASL", function () {
 				"SASL authentication failed: timed out waiting for the server"
 			);
 			expect(transport.sent).to.include("AUTHENTICATE *");
-			expectAborted(transport, client);
+			expect(transport.sent).to.not.include("CAP END");
+			expect(transport.sent[transport.sent.length - 1]).to.equal(
+				"QUIT :SASL authentication failed"
+			);
+			expect(transport.abandonCalls).to.deep.equal(["SASL timed out"]);
+			expect(transport.closeCalls).to.equal(0);
+			expect(client.isQuitting).to.equal(false);
+			expect(client.isConnected).to.equal(false);
+			expect(errors(client.lobby.id)).to.deep.equal([
+				"SASL authentication failed: timed out waiting for the server",
+				"Not connecting to irc.test without the login you asked for; trying again.",
+			]);
+			// Not a credentials problem, and the close that followed was ours.
+			expect(texts(client.lobby.id)).to.not.include(SASL_REQUIRED_HINT);
+			expect(texts(client.lobby.id)).to.include("Reconnecting in 1s (attempt 1)…");
 		} finally {
 			clock.restore();
 		}

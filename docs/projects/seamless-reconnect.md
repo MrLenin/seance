@@ -357,3 +357,109 @@ sends twice at that moment; it is not the catch-up (guarded and cancelled
 on close), not the `connecting` listener, not `connect()`/`onOpen()`.
 Pre-existing and cosmetic; attribute with a breakpoint on `client.send`
 when the lobby noise is next worked on.
+
+## Round seven: back after a long absence, and the socket a quick switch loses (2026-09-06)
+
+Reported from the phone: after the app had been away for a long time,
+bringing it back did not reconnect ("it might be due to a really slow
+backoff on retries"), and the socket seemed to drop the instant the app lost
+focus, so every switch cost a reconnect. No device in the loop this time;
+what follows is read from `transport.ts`, `client.ts` and `manager.ts`, and
+each rule is pinned by a unit test.
+
+What the code allowed:
+
+- **The retries that piled up while the app was away decided the wait
+  after the poke.** A hidden page keeps running for a while (Android's
+  Chrome freezes it after ~5 min; a desktop tab never stops), and every
+  retry that failed there stepped the schedule up — 1, 2, 4 … 60 s. The
+  counter only reset after a connection that stayed up 30 s. The foreground
+  poke did dial at once, but when that one dial failed (radio still coming
+  up, the 15 s connect timeout) the _next_ wait was the cap: 30–60 s of
+  "Reconnecting in 47s…" with nothing to re-poke it, which is what "does not
+  reconnect" looks like to someone who checks for half a minute. The
+  immediate retry after a probe was also gated on `attempt === 1`, which a
+  phone whose connections are each shorter than 30 s never has.
+- **A SASL timeout was final.** The 12 s timer ended in `disconnect()` —
+  QUIT plus a deliberate close, which the transport treats as the user's
+  decision: state `closed`, and `reconnectAll` leaves `closed` alone (it
+  cannot tell it from a network the user disconnected). Services slow on
+  return, and the network sat there until the user reconnected by hand.
+- **Nothing in the client closes the socket on blur or hidden.** The OS
+  does: iOS suspends the page within seconds of a switch and the socket
+  with it; Android drops it when Chrome freezes the page or Doze cuts the
+  network. A web page cannot ask for a grace period there — a native shell
+  could (an iOS background task is worth ~30 s, Android a foreground
+  service), which makes it an E.4 item, not a client fix. The one
+  client-side QUIT that could hit a page that comes back was `pagehide`
+  with `persisted` (back/forward cache).
+
+What changed:
+
+- **A request to connect restarts the schedule.** `WsTransport.connect()`
+  from outside — the foreground poke on a `reconnect-wait` network, a click,
+  `redial()` — zeroes the attempt counter (the timer's own retry goes
+  through a private `dial()`), so a failed foreground dial waits 1 s, then
+  2, 4 …, not the cap. A socket lost while `probe()` was waiting zeroes it
+  too, so the immediate retry no longer depends on the count. Only that
+  first retry is immediate; a failure resumes the schedule from attempt 2.
+  Tests: `test/irc/transport.ts` § "a request to connect restarts the
+  schedule".
+- **A SASL timeout QUITs and retries** (`saslFailed(reason, timedOut)`):
+  the lobby says "Not connecting to … without the login you asked for;
+  trying again.", the QUIT goes out, and `transport.abandon("SASL timed out")` drops the socket as _lost_ (close 1006, `willReconnect`), so the
+  schedule and the foreground poke keep working on it; `closeExplained`
+  keeps `onClose` from reporting that close a second time. Rejections —
+  904, a NAK, no usable cap, no credentials — still end in `disconnect()`:
+  a retry cannot fix those, and looping on a wrong password would be worse.
+  The `isQuitting` guard in `handlers/cap.ts` is not needed on this path:
+  the socket is gone before the negotiator can queue anything. Test:
+  `test/irc/client-sasl.ts` § "QUITs and retries when the exchange times
+  out".
+- **`WsTransport.abandon(reason)`** (optional on `Transport`): give up the
+  socket, keep the connection — what the probe and connect timeouts already
+  did internally, now for callers above the transport.
+- **Waits at the cap stay at or above 45 s.** Jitter is `[3/4, 1] × base`
+  instead of `[1/2, 1]`. nefarious2's IPcheck (`ircd/IPcheck.c`
+  `ip_registry_check_local`; `IPCHECK_CLONE_LIMIT` 4, `IPCHECK_CLONE_PERIOD`
+  40 s by default) refuses the fourth connection from an address when each
+  gap is 40 s or less, and every refusal renews the window, so a client
+  cycling faster than that could never get back in — and the refusal is
+  invisible, the browser sees 1006 like any unreachable server. Only
+  _accepted_ connections count, a dial that never reaches the server is
+  free, which is why the fast start of the schedule is safe and only its
+  tail needs the floor. See `docs/resources/nefarious2-websocket.md`
+  § Connection throttle.
+- **No QUIT on a `persisted` pagehide** (`manager.ts`): a page going into
+  the back/forward cache may come back as it is, and `pageshow` pokes it.
+
+On a return after a long absence this now reads: poke → dial now; if that
+fails, 1 s, 2 s, 4 s … while the user watches, instead of one dial and a
+minute of nothing. A SASL timeout on return: "trying again" and the
+schedule, instead of a network that needs a tap. A quick switch on Android
+keeps its socket (it always did; the probe confirms it); on iOS the OS
+takes it and the reattach is immediate and quiet.
+
+Measured in a real browser with `tools/scenarios/reconnect-after-backoff.mjs`
+(the page connects through a TCP proxy the scenario runs; the proxy cuts the
+socket and refuses every dial for 36 s, then the scenario fires a window
+`focus` and reads the lobby): the retries reach `Reconnecting in 30s (attempt 6)…`, the focus signal dials at once on both builds, and after that
+dial fails the develop build schedules `Reconnecting in 31s (attempt 7)…`
+and misses the 10 s window in which the proxy lets dials through again,
+while this branch schedules `Reconnecting in 1s (attempt 1)…` and is
+registered on that retry. Run it against a served build with an ircd on
+`ws://127.0.0.1:8067`:
+
+```sh
+node tools/browser-drive.mjs tools/scenarios/reconnect-after-backoff.mjs --chrome=…
+SEANCE_URL=https://127.0.0.1:8000 node tools/browser-drive.mjs tools/scenarios/reconnect-after-backoff.mjs   # another deploy
+```
+
+Worth confirming on the phone: the lobby after a long absence should show
+`Connecting to …` within a second of the app coming back, and never a
+`Reconnecting in <tens of seconds>…` right after a switch.
+
+Follow-ups: the lobby noise on a resume (open since round two); a
+background grace period in the native shells (E.4); the
+`Reconnecting in …` line could count down or offer a "now" tap for the rare
+wait a user does have to sit through.

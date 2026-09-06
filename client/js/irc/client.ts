@@ -270,6 +270,8 @@ export class IrcClient {
 	private lastTransportError?: string;
 	/** The close report's hint is shown once per attempt series, not per retry. */
 	private closeHintShown = false;
+	/** The close about to arrive is ours and the lobby already says why (transport.abandon). */
+	private closeExplained = false;
 	private activeChanId = 0;
 	/** Set while a history batch is replayed through the handlers (see `collectReplay`). */
 	private replayContext: {target: Channel; collected: ReplayCollection} | null = null;
@@ -715,12 +717,22 @@ export class IrcClient {
 	 * SASL was asked for and did not succeed. Always reported — silently
 	 * registering as a stranger when the user asked to log in hides
 	 * everything from a typo in the password to services being down — and,
-	 * unless the deploy turned {@link saslRequired} off, fatal: QUIT and stay
-	 * down instead of connecting unauthenticated.
+	 * unless the deploy turned {@link saslRequired} off, never carried on
+	 * with: QUIT instead of connecting unauthenticated.
+	 *
+	 * What comes after the QUIT depends on what failed. A rejection (904, a
+	 * server without the cap, a NAK, missing credentials) will not change
+	 * on a retry, so the network stays down. A `timedOut` exchange is the
+	 * server or its services being slow — the phone coming back to a poor
+	 * link, a lagging services link — and retrying is exactly right: the
+	 * socket is dropped as lost (`transport.abandon`) and the usual
+	 * reconnect follows, so the foreground poke and the schedule keep
+	 * working on it instead of leaving the network for the user to reconnect
+	 * by hand.
 	 *
 	 * Returns true when it dropped the connection, so callers stop there.
 	 */
-	private saslFailed(reason: string): boolean {
+	private saslFailed(reason: string, timedOut = false): boolean {
 		this.pushMessage(
 			this.lobby,
 			{type: MessageType.ERROR, text: `SASL authentication failed: ${reason}`},
@@ -729,6 +741,25 @@ export class IrcClient {
 
 		if (!this.saslRequired) {
 			return false;
+		}
+
+		if (timedOut && this.transport.abandon) {
+			this.pushMessage(
+				this.lobby,
+				{
+					type: MessageType.ERROR,
+					text: `Not connecting to ${this.options.host} without the login you asked for; trying again.`,
+				},
+				true
+			);
+
+			if (this.transport.state === "open") {
+				this.transport.send(trailingLine("QUIT", ["SASL authentication failed"]));
+			}
+
+			this.closeExplained = true;
+			this.transport.abandon("SASL timed out");
+			return true;
 		}
 
 		this.pushMessage(
@@ -816,8 +847,11 @@ export class IrcClient {
 		return this.sasl.start();
 	}
 
-	/** Apply what the state machine returned for one inbound line (called by handlers/sasl.ts). */
-	saslProgress(result: SaslResult): void {
+	/**
+	 * Apply what the state machine returned for one inbound line (called by
+	 * handlers/sasl.ts), or for the timer running out (`timedOut`).
+	 */
+	saslProgress(result: SaslResult, timedOut = false): void {
 		for (const line of result.send) {
 			this.send(line);
 		}
@@ -836,7 +870,7 @@ export class IrcClient {
 		if (!result.ok) {
 			this.saslOk = false;
 
-			if (this.saslFailed(result.error ?? "unknown error")) {
+			if (this.saslFailed(result.error ?? "unknown error", timedOut)) {
 				return;
 			}
 		} else {
@@ -881,7 +915,7 @@ export class IrcClient {
 			this.saslTimer = null;
 
 			if (this.sasl && !this.sasl.done) {
-				this.saslProgress(this.sasl.abort("timed out waiting for the server"));
+				this.saslProgress(this.sasl.abort("timed out waiting for the server"), true);
 			}
 		}, SASL_TIMEOUT_MS);
 	}
@@ -945,6 +979,9 @@ export class IrcClient {
 		if (wasUp) {
 			if (this.quitting) {
 				this.pushMessage(this.lobby, {text: "Disconnected."}, true);
+			} else if (this.closeExplained) {
+				// We dropped the socket ourselves and said why just before.
+				this.closeExplained = false;
 			} else {
 				const report = describeClose({
 					url: this.url,

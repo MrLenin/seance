@@ -248,7 +248,11 @@ function onEvent(msg) {
 			note(frameLine("←", params.requestId, params.response));
 			break;
 		case "Network.webSocketFrameError":
-			failures.push(`ws frame error: ${params.errorMessage}`);
+			// A scenario that refuses dials on purpose sets `page.expectWsErrors`.
+			if (!page.expectWsErrors) {
+				failures.push(`ws frame error: ${params.errorMessage}`);
+			}
+
 			console.log(`ws ERROR [${params.requestId.slice(-6)}] ${params.errorMessage}`);
 			break;
 		case "Network.webSocketClosed":
@@ -452,6 +456,11 @@ const page = {
 	screenshot,
 	check,
 	sleep,
+	/** While true, a failed WebSocket dial is logged but not counted as a
+	 * failure — for a scenario that refuses connections on purpose to watch
+	 * the reconnect schedule. Set it back to false before the part of the
+	 * run where a dial is expected to succeed. */
+	expectWsErrors: false,
 	get consoleLogs() {
 		return consoleLogs;
 	},
