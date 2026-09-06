@@ -190,6 +190,33 @@
 			</label>
 		</div>
 
+		<h2 id="label-font-size">Font size</h2>
+		<div role="group" aria-labelledby="label-font-size" class="font-size-setting">
+			<!-- No `name`: the window's generic @change handler would store the
+			     raw slider index; onFontSizeInput stores the scale name and
+			     previews live while dragging. -->
+			<input
+				type="range"
+				min="0"
+				:max="fontSizes.length - 1"
+				step="1"
+				list="font-size-stops"
+				:value="fontSizeIndex"
+				:aria-valuetext="fontSizeLabel"
+				aria-label="Message font size"
+				@input="onFontSizeInput"
+			/>
+			<datalist id="font-size-stops">
+				<option
+					v-for="(size, index) in fontSizes"
+					:key="size"
+					:value="index"
+					:label="fontSizeLabels[size]"
+				></option>
+			</datalist>
+			<span class="font-size-value" aria-hidden="true">{{ fontSizeLabel }}</span>
+		</div>
+
 		<h2>Theme</h2>
 		<div>
 			<label for="theme-select" class="sr-only">Theme</label>
@@ -229,11 +256,29 @@
 textarea#user-specified-css-input {
 	height: 100px;
 }
+
+.font-size-setting {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.font-size-setting input[type="range"] {
+	flex: 1;
+	max-width: 320px;
+	margin: 0;
+}
+
+.font-size-setting .font-size-value {
+	min-width: 90px;
+	color: var(--body-color-muted);
+}
 </style>
 
 <script lang="ts">
 import {computed, defineComponent} from "vue";
 import {useStore} from "../../js/store";
+import {fontSizeLabels, fontSizes, normalizeFontSize} from "../../js/helpers/fontSize";
 import {
 	clearTrusted,
 	splitKey,
@@ -282,12 +327,30 @@ export default defineComponent({
 			trustedGroups.value.reduce((n, g) => n + g.entries.length, 0)
 		);
 
+		const fontSize = computed(() => normalizeFontSize(store.state.settings.fontSize));
+		const fontSizeIndex = computed(() => fontSizes.indexOf(fontSize.value));
+		const fontSizeLabel = computed(() => fontSizeLabels[fontSize.value]);
+
+		const onFontSizeInput = (event: Event) => {
+			const index = Number((event.target as HTMLInputElement).value);
+			const value = fontSizes[index];
+
+			if (value) {
+				void store.dispatch("settings/update", {name: "fontSize", value, sync: true});
+			}
+		};
+
 		return {
 			store,
 			trustedGroups,
 			trustedCount,
 			untrust,
 			clearTrusted,
+			fontSizes,
+			fontSizeLabels,
+			fontSizeIndex,
+			fontSizeLabel,
+			onFontSizeInput,
 		};
 	},
 });

@@ -81,6 +81,32 @@
 
 	/* Color the sidebar channel icon pulses to just after someone spoke there */
 	--channel-activity-color: #7fb8e8;
+
+	/* Message text size: the chat area, the input and the user list. The
+	 * Appearance settings slider picks one of the html[data-font-size] scales
+	 * below; "medium" is this default. */
+	--user-font-size: 14px;
+}
+
+/* The font-size setting's scale (client/js/helpers/fontSize.ts). */
+html[data-font-size="tiny"] {
+	--user-font-size: 10px;
+}
+
+html[data-font-size="small"] {
+	--user-font-size: 12px;
+}
+
+html[data-font-size="large"] {
+	--user-font-size: 16px;
+}
+
+html[data-font-size="xlarge"] {
+	--user-font-size: 18px;
+}
+
+html[data-font-size="huge"] {
+	--user-font-size: 21px;
 }
 
 ::placeholder {
@@ -1452,8 +1478,16 @@ textarea.input {
 #form,
 .messages .msg,
 .userlist {
-	font-size: 14px;
+	font-size: var(--user-font-size, 14px);
 	line-height: 1.4;
+}
+
+/* Inline code and code blocks track the message text: the global `code` rule
+ * is a fixed 13px, which only matches the messages until the font-size
+ * setting moves the base. 0.93em of the 14px default is that same 13px. */
+.messages .msg code,
+.messages .msg .irc-monospace {
+	font-size: 0.93em;
 }
 
 #chat .chat-content {
