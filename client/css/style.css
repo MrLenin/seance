@@ -850,13 +850,58 @@ background on hover (unless active) */
 	color: #84ce88;
 	font-size: 15px;
 	font-weight: bold;
-	padding-left: 0;
+	padding: 6px 14px 4px 0;
 }
 
+/* The network header is three rows inside one tab — one click target, one drag
+handle, one hover — so the name reads at full width instead of sharing its line
+with four tools: `.lobby-title` is the chevron, the name and the unread badge;
+`.lobby-nick` under it is the nick this connection uses, on a line of its own so
+it is never squeezed by the tools; `.lobby-tools` (connection state,
+notifications, edit, join) is the last line, a right-aligned toolbar. The
+wrapper is what the jump-to results' server glyph (::before) sits beside. */
 .channel-list-item .lobby-wrap {
 	display: flex;
+	flex-direction: column;
 	flex-grow: 1;
+	min-width: 0;
 	overflow: hidden;
+}
+
+.channel-list-item .lobby-title {
+	display: flex;
+	align-items: center;
+	min-width: 0;
+}
+
+.channel-list-item .lobby-nick,
+.channel-list-item .lobby-tools {
+	padding-left: 40px; /* under the name, past the chevron's column */
+	font-size: 12px;
+	font-weight: normal;
+}
+
+.channel-list-item .lobby-nick {
+	margin-top: 1px;
+	overflow: hidden;
+	white-space: nowrap;
+	color: rgb(183 197 209 / 75%); /* the sidebar's #b7c5d1, stepped back */
+	mask-image: linear-gradient(to left, transparent, black 20px);
+}
+
+.channel-list-item .lobby-tools {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 4px;
+	margin-top: 2px;
+}
+
+/* In the jump-to results a network is a destination, not a thing to operate
+on: the nick still tells the networks apart, the toolbar would only get in the
+way of the click. */
+.jump-to-results .channel-list-item .lobby-tools {
+	display: none;
 }
 
 .channel-list-item[data-type="lobby"]:hover,
@@ -1015,10 +1060,12 @@ the same counter the badge shows). Muted channels keep their faded look. */
 	opacity: 1;
 }
 
+/* Every tool on the status line is the same 22px box, so the block reads as one
+toolbar and each is a fair touch target. */
 .channel-list-item[data-type="lobby"] .add-channel {
 	border-radius: 3px;
-	width: 18px;
-	height: 18px;
+	width: 22px;
+	height: 22px;
 	opacity: 0.4;
 	transition: opacity 0.2s, background-color 0.2s, transform 0.2s;
 }
@@ -1027,7 +1074,7 @@ the same counter the badge shows). Muted channels keep their faded look. */
 	font-size: 20px;
 	font-weight: normal;
 	display: inline-block;
-	line-height: 16px;
+	line-height: 20px;
 	text-align: center;
 	content: "+";
 	color: #fff;
@@ -1044,9 +1091,8 @@ the same counter the badge shows). Muted channels keep their faded look. */
 
 .channel-list-item[data-type="lobby"] .edit-network {
 	border-radius: 3px;
-	width: 18px;
-	height: 18px;
-	margin-right: 4px;
+	width: 22px;
+	height: 22px;
 	opacity: 0.4;
 	transition: opacity 0.2s, background-color 0.2s;
 }
@@ -1055,7 +1101,7 @@ the same counter the badge shows). Muted channels keep their faded look. */
 	content: "\f013"; /* https://fontawesome.com/icons/cog?style=solid */
 	font-size: 13px;
 	display: inline-block;
-	line-height: 18px;
+	line-height: 22px;
 	text-align: center;
 	color: #fff;
 }
@@ -1067,12 +1113,11 @@ the same counter the badge shows). Muted channels keep their faded look. */
 .channel-list-item .connection-status-tooltip {
 	flex-shrink: 0;
 	line-height: 1;
-	margin: 0 8px;
 }
 
 .channel-list-item .connection-status-icon {
-	width: 18px;
-	height: 18px;
+	width: 22px;
+	height: 22px;
 	opacity: 0.7;
 	transition: opacity 0.2s;
 }
@@ -1080,7 +1125,7 @@ the same counter the badge shows). Muted channels keep their faded look. */
 .channel-list-item .connection-status-icon::before {
 	font-size: 12px;
 	display: inline-block;
-	line-height: 18px;
+	line-height: 22px;
 	text-align: center;
 }
 
@@ -1096,13 +1141,12 @@ the same counter the badge shows). Muted channels keep their faded look. */
 .channel-list-item .notify-tooltip {
 	flex-shrink: 0;
 	line-height: 1;
-	margin: 0 4px;
 }
 
 .channel-list-item .notify-status-icon {
 	display: inline-block;
-	width: 18px;
-	height: 18px;
+	width: 22px;
+	height: 22px;
 	opacity: 0.7;
 	transition: opacity 0.2s;
 }
@@ -1113,7 +1157,7 @@ the same counter the badge shows). Muted channels keep their faded look. */
 
 .channel-list-item .notify-status-icon::before {
 	font-size: 11px;
-	line-height: 18px;
+	line-height: 22px;
 	text-align: center;
 }
 
