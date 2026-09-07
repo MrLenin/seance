@@ -1,8 +1,10 @@
 // The font-size setting end to end in a real browser: the Appearance slider
-// moves `data-font-size` on <html> live while dragging, the chat area
-// (input, messages, user list) tracks `--user-font-size`, the stored value
-// is the scale name and not the slider index, and the choice survives a
-// reload (client/js/helpers/fontSize.ts, settings.ts, style.css).
+// moves `data-font-size` on <html> live while dragging, the root font size
+// follows it and so does everything sized in rem off it — the chat area
+// (input, messages, user list) and the chrome (sidebar rows, header, footer,
+// buttons) alike — the stored value is the scale name and not the slider
+// index, and the choice survives a reload (client/js/helpers/fontSize.ts,
+// settings.ts, style.css).
 //
 //   corepack yarn build && python3 -m http.server -d public 8021 &
 //   node tools/browser-drive.mjs tools/scenarios/font-size-setting.mjs
@@ -17,9 +19,12 @@ const BASE = "http://localhost:8021/";
 export const url = `${BASE}?host=127.0.0.1&port=8067&tls=false&nick=${NICK}&join=%23seance`;
 
 const DATASET = `document.documentElement.dataset.fontSize ?? null`;
-const VAR = `getComputedStyle(document.documentElement).getPropertyValue("--user-font-size").trim()`;
+const ROOT_PX = `getComputedStyle(document.documentElement).fontSize`;
 const FORM_PX = `getComputedStyle(document.querySelector("#form")).fontSize`;
 const USERLIST_PX = `getComputedStyle(document.querySelector(".userlist")).fontSize`;
+const SIDEBAR_ROW_PX = `getComputedStyle(document.querySelector('.channel-list-item[data-type="channel"]')).fontSize`;
+const HEADER_HEIGHT = `getComputedStyle(document.querySelector("#chat .header")).height`;
+const FOOTER_BTN = `getComputedStyle(document.querySelector("#footer button.settings")).width`;
 const STORED = `JSON.parse(localStorage.getItem("settings") ?? "{}").fontSize ?? null`;
 const SLIDER = `.font-size-setting input[type="range"]`;
 
@@ -47,10 +52,13 @@ export default async function run(page) {
 		timeout: 20000,
 		label: "chat input up",
 	});
-	page.check("boots at medium", (await page.evaluate(DATASET)) === "medium");
-	page.check("default var is 14px", (await page.evaluate(VAR)) === "14px");
-	page.check("input area at 14px", (await page.evaluate(FORM_PX)) === "14px");
-	await page.screenshot("chat-medium");
+	page.check("boots at large", (await page.evaluate(DATASET)) === "large");
+	page.check("default root is 16px", (await page.evaluate(ROOT_PX)) === "16px");
+	page.check("input area at 16px", (await page.evaluate(FORM_PX)) === "16px");
+	page.check("sidebar rows at 16px", (await page.evaluate(SIDEBAR_ROW_PX)) === "16px");
+	page.check("header is 3rem = 48px", (await page.evaluate(HEADER_HEIGHT)) === "48px");
+	page.check("footer buttons 3rem = 48px", (await page.evaluate(FOOTER_BTN)) === "48px");
+	await page.screenshot("chat-large");
 
 	// To Settings → Appearance, by real clicks. Both are <button>s rendered
 	// through custom router-links, not <a>s.
@@ -60,11 +68,14 @@ export default async function run(page) {
 	});
 	await page.click(`.settings-menu button.appearance`);
 	await page.waitFor(`!!document.querySelector(${JSON.stringify(SLIDER)})`, {label: "slider up"});
-	page.check("slider sits at medium", (await page.evaluate(`document.querySelector(${JSON.stringify(SLIDER)}).value`)) === "2");
+	page.check(
+		"slider sits at large",
+		(await page.evaluate(`document.querySelector(${JSON.stringify(SLIDER)}).value`)) === "3"
+	);
 
 	await setSlider(5);
 	page.check("html carries huge", (await page.evaluate(DATASET)) === "huge");
-	page.check("var moves live", (await page.evaluate(VAR)) === "21px");
+	page.check("root moves live", (await page.evaluate(ROOT_PX)) === "21px");
 	page.check(
 		"label reads Huge",
 		(await page.evaluate(`document.querySelector(".font-size-value")?.textContent.trim()`)) ===
@@ -76,22 +87,28 @@ export default async function run(page) {
 	// the input has no `name` precisely so that handler cannot overwrite the
 	// name with the raw slider index.
 	await page.evaluate(
-		`document.querySelector(${JSON.stringify(SLIDER)}).dispatchEvent(new Event("change", {bubbles: true}))`
+		`document.querySelector(${JSON.stringify(
+			SLIDER
+		)}).dispatchEvent(new Event("change", {bubbles: true}))`
 	);
 	page.check("drag end does not clobber", (await page.evaluate(STORED)) === "huge");
 	await page.screenshot("settings-huge");
 
 	// Spot-check the other end of the scale, then back to huge.
 	await setSlider(0);
-	page.check("tiny is 10px", (await page.evaluate(VAR)) === "10px");
+	page.check("tiny is 10px", (await page.evaluate(ROOT_PX)) === "10px");
 	await setSlider(5);
-	page.check("back to huge", (await page.evaluate(VAR)) === "21px");
+	page.check("back to huge", (await page.evaluate(ROOT_PX)) === "21px");
 
 	// Back on the channel the chat text actually wears it.
 	await page.click(`.channel-list-item[data-name="#seance"]`);
 	await page.waitFor(`!!document.querySelector("#form #input")`, {label: "back on chat"});
 	page.check("input area at 21px", (await page.evaluate(FORM_PX)) === "21px");
 	page.check("userlist at 21px", (await page.evaluate(USERLIST_PX)) === "21px");
+	// The chrome wears it too: that is the point of sizing it in rem.
+	page.check("sidebar rows at 21px", (await page.evaluate(SIDEBAR_ROW_PX)) === "21px");
+	page.check("header grew to 63px", (await page.evaluate(HEADER_HEIGHT)) === "63px");
+	page.check("footer buttons grew to 63px", (await page.evaluate(FOOTER_BTN)) === "63px");
 
 	if ((await page.count(".messages .msg")) > 0) {
 		page.check(

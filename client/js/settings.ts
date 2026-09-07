@@ -72,12 +72,12 @@ const defaultConfig = {
 	pushKeyChange: {
 		default: "ask",
 	},
-	// Message text size (the chat area, input and user list). The scale and
-	// its normalization live in helpers/fontSize.ts; the pixel values live in
-	// style.css, keyed off <html data-font-size="...">, so themes and the
-	// custom stylesheet can override them.
+	// UI scale: the root font size everything in style.css is sized off in
+	// rem. The scale and its normalization live in helpers/fontSize.ts; the
+	// values live in style.css, keyed off <html data-font-size="...">, so
+	// themes and the custom stylesheet can override them.
 	fontSize: {
-		default: "medium",
+		default: "large",
 		apply(store: TypedStore, value: string) {
 			document.documentElement.dataset.fontSize = normalizeFontSize(value);
 		},

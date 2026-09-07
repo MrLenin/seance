@@ -79,7 +79,7 @@
 	display: flex;
 	justify-content: space-between;
 	margin-bottom: 10px;
-	font-size: 20px;
+	font-size: 1.25rem;
 }
 
 .mentions-popup .mentions-info {
@@ -106,7 +106,7 @@
 }
 
 .mentions-popup .msg-dismiss::before {
-	font-size: 20px;
+	font-size: 1.25rem;
 	font-weight: normal;
 	display: inline-block;
 	line-height: 16px;
@@ -139,7 +139,7 @@
 		right: 0;
 		left: 0;
 		bottom: 0;
-		top: 45px; /* header height */
+		top: 3rem; /* header height */
 	}
 }
 </style>
