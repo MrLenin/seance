@@ -27,11 +27,14 @@ const configuration: SharedConfiguration = {
 	release: process.env.SEANCE_RELEASE || pkg.version,
 	gitCommit: process.env.SEANCE_COMMIT || null,
 	// One CSS file each under client/themes/; docs/resources/themes.md. The
-	// two Ink & Amber themes carry their titlebar tone as the browser chrome
-	// colour, the older two leave it to the deploy's themeColor.
+	// four handoff themes (Ink & Amber, Cobalt Frost) carry their titlebar
+	// tone as the browser chrome colour, the older two leave it to the
+	// deploy's themeColor.
 	themes: [
 		{name: "coffee", displayName: "Coffee", themeColor: "#1a1816"},
 		{name: "creama", displayName: "Creama", themeColor: "#efe9de"},
+		{name: "cobalt", displayName: "Cobalt", themeColor: "#101720"},
+		{name: "frost", displayName: "Frost", themeColor: "#eef2f7"},
 		{name: "day", displayName: "Day", themeColor: null},
 		{name: "morning", displayName: "Morning", themeColor: null},
 	],
