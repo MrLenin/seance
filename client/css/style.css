@@ -389,6 +389,7 @@ p {
 .channel-list-item .connection-status-icon::before,
 .channel-list-item .notify-status-icon::before,
 .channel-list-item .edit-network::before,
+.channel-list-item .add-channel::before,
 .channel-list-item .parted-channel-icon::before,
 .jump-to-input::before,
 .password-container .reveal-password span,
@@ -1066,7 +1067,11 @@ the same counter the badge shows). Muted channels keep their faded look. */
 
 /* Every tool on the status line is the same 20px box with its glyph centred, so
 the block reads as one evenly spaced toolbar (a button centres its content by
-itself; the bell is a span and has to be told). */
+itself; the bell is a span and has to be told). Even boxes are not enough on
+their own: the eye measures the gaps between ink, so the four glyphs are all
+FontAwesome solids of about the same size and weight — the join tool used to
+be a thin 20px text "+" and the bell a smaller, dimmer glyph, and the row
+looked unevenly spaced however evenly the boxes sat. */
 .channel-list-item[data-type="lobby"] .add-channel {
 	border-radius: 3px;
 	width: 20px;
@@ -1076,12 +1081,11 @@ itself; the bell is a span and has to be told). */
 }
 
 .channel-list-item[data-type="lobby"] .add-channel::before {
-	font-size: 20px;
-	font-weight: normal;
+	content: "\f067"; /* https://fontawesome.com/icons/plus?style=solid */
+	font-size: 13px;
 	display: inline-block;
-	line-height: 18px;
+	line-height: 20px;
 	text-align: center;
-	content: "+";
 	color: #fff;
 }
 
@@ -1162,7 +1166,7 @@ itself; the bell is a span and has to be told). */
 }
 
 .channel-list-item .notify-status-icon::before {
-	font-size: 11px;
+	font-size: 13px;
 	line-height: 20px;
 }
 
@@ -1171,16 +1175,23 @@ itself; the bell is a span and has to be told). */
 	color: #2ea043;
 }
 
+/* Not subscribed: the same white-at-0.4 as the gear and the plus beside it,
+so the toolbar has one weight; green is what marks a subscribed bell. */
+.channel-list-item .notify-status-icon.enabled,
+.channel-list-item .notify-status-icon.off {
+	opacity: 0.4;
+}
+
 .channel-list-item .notify-status-icon.enabled::before {
 	content: "\f0f3"; /* bell: notifications on, not subscribed (the font is
 	                    FA5 solid-only, so no outline variant exists — the
-	                    muted colour is what separates this from on) */
-	color: var(--body-color-muted);
+	                    colour is what separates this from on) */
+	color: #fff;
 }
 
 .channel-list-item .notify-status-icon.off::before {
 	content: "\f1f6"; /* bell-slash: notifications off */
-	color: var(--body-color-muted);
+	color: #fff;
 }
 
 .channel-list-item .connection-status-icon.is-connected::before {
