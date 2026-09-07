@@ -47,17 +47,17 @@ form.message-search input::placeholder {
 
 @media (min-width: 480px) {
 	form.message-search input {
-		min-width: 140px;
+		min-width: 8.75rem;
 	}
 
 	form.message-search input:focus {
-		min-width: 220px;
+		min-width: 15rem;
 	}
 }
 
 form.message-search .input-wrapper {
 	position: absolute;
-	top: 45px;
+	top: 3rem;
 	left: 0;
 	right: 0;
 	z-index: 1;

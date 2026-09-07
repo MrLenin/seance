@@ -8,11 +8,11 @@ import {
 
 // The scale itself is the contract: Appearance.vue's slider maps positions to
 // names through this module, settings.ts normalizes whatever localStorage
-// held, and style.css keys `--user-font-size` off the names.
+// held, and style.css keys the root font-size off the names.
 describe("fontSize", () => {
-	it("is an ordered scale with medium in the middle", () => {
+	it("is an ordered scale, large (the browser default) being the default", () => {
 		expect(fontSizes).to.deep.equal(["tiny", "small", "medium", "large", "xlarge", "huge"]);
-		expect(defaultFontSize).to.equal("medium");
+		expect(defaultFontSize).to.equal("large");
 	});
 
 	it("passes values on the scale through", () => {

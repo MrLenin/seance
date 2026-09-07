@@ -1,5 +1,4 @@
 <template>
-	<!-- 220px is the width of the sidebar, and we add 100px to allow for the text -->
 	<aside class="settings-menu">
 		<h2>Settings</h2>
 		<ul role="navigation" aria-label="Settings tabs">
@@ -21,16 +20,19 @@
 .settings-menu {
 	position: fixed;
 	/* top: Header + (padding bottom of h2 - border) */
-	top: calc(45px + 5px);
-	/* Mid page minus width of container and 30 pixels for padding */
-	margin-left: calc(50% - 480px - 30px);
+	top: calc(3rem + 5px);
+	/* Mid page minus the width of the container and 30 pixels for padding.
+	   The static position already sits right of the sidebar, so at the
+	   larger UI scales on a narrow window the offset is clamped there
+	   instead of sliding under it. */
+	margin-left: max(0.5rem, calc(50% - 30rem - 30px));
 }
 
 /** The calculation is mobile +  2/3 of container width. Fairly arbitrary. */
 @media screen and (max-width: calc(768px + 320px)) {
 	.settings-menu {
 		position: static;
-		width: min(480px, 100%);
+		width: min(30rem, 100%);
 		align-self: center;
 		margin: 0 auto;
 		padding: 0 15px;
@@ -42,7 +44,7 @@
 }
 
 .settings-menu li {
-	font-size: 18px;
+	font-size: 1.125rem;
 	list-style: none;
 }
 

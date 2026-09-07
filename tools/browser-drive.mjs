@@ -43,6 +43,8 @@
 //   --chrome=<bin>    Chromium binary (default $CHROME_BIN or "chromium")
 //   --timeout=<ms>    default wait timeout inside a scenario (default 20000)
 //   --profile=<dir>   reuse a profile dir instead of a throwaway one
+//   --width=<px>      viewport width (default 1280); --height=<px> (default 900)
+//   --mobile          emulate a touch device (mobile viewport, no hover)
 //
 // A throwaway profile is the default on purpose: localStorage (saved
 // networks, settings, `thelounge.media.trusted`) survives inside one profile,
@@ -509,11 +511,14 @@ try {
 	}
 
 	await send("Emulation.setDeviceMetricsOverride", {
-		width: 1280,
-		height: 900,
+		width: Number(opt("width", 1280)),
+		height: Number(opt("height", 900)),
 		deviceScaleFactor: 1,
-		mobile: false,
+		mobile: flags.has("--mobile"),
 	});
+	if (flags.has("--mobile")) {
+		await send("Emulation.setTouchEmulationEnabled", {enabled: true, maxTouchPoints: 5});
+	}
 
 	if (scenarioPath) {
 		const file = isAbsolute(scenarioPath) ? scenarioPath : resolve(scenarioPath);

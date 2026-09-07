@@ -37,7 +37,7 @@ const appName =
 const themeColor =
 	typeof branding.themeColor === "string" && /^#[0-9a-f]{6}$/i.test(branding.themeColor)
 		? branding.themeColor
-		: "#415364";
+		: "#1a1816";
 
 const config: CapacitorConfig = {
 	// REBRAND: reverse-DNS bundle id. Placeholder until a network ships this;

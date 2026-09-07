@@ -154,7 +154,7 @@
 	border: 0;
 	color: #fff;
 	background-color: rgba(255, 255, 255, 0.1);
-	padding-right: 35px;
+	padding-right: 2.5rem;
 	appearance: none;
 }
 
@@ -170,7 +170,7 @@
 	top: 0;
 	bottom: 0;
 	pointer-events: none;
-	line-height: 35px !important;
+	line-height: 2.5rem !important;
 }
 
 .jump-to-results {

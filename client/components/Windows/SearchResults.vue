@@ -83,7 +83,7 @@
 
 .chat-view[data-type="search-results"] .search-scope-note {
 	padding: 10px;
-	font-size: 12px;
+	font-size: 0.8125rem;
 	text-align: center;
 	opacity: 0.6;
 }

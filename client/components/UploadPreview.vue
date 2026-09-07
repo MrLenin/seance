@@ -112,7 +112,7 @@
 }
 
 #upload-preview .confirm-text-title {
-	font-size: 20px;
+	font-size: 1.25rem;
 	font-weight: 700;
 	margin-bottom: 6px;
 }
@@ -120,7 +120,7 @@
 #upload-preview .upload-preview-hint {
 	margin: 0 0 12px;
 	opacity: 0.75;
-	font-size: 13px;
+	font-size: 0.875rem;
 }
 
 #upload-preview .upload-preview-list {
@@ -168,7 +168,7 @@
 
 #upload-preview .upload-preview-badge {
 	font-weight: 700;
-	font-size: 14px;
+	font-size: 1rem;
 	letter-spacing: 1px;
 	padding: 20px 8px;
 	opacity: 0.8;
@@ -189,12 +189,12 @@
 }
 
 #upload-preview .upload-preview-details {
-	font-size: 13px;
+	font-size: 0.875rem;
 	opacity: 0.75;
 }
 
 #upload-preview .upload-preview-note {
-	font-size: 12px;
+	font-size: 0.8125rem;
 	opacity: 0.85;
 }
 
@@ -211,7 +211,7 @@
 	background: transparent;
 	color: inherit;
 	font: inherit;
-	font-size: 14px;
+	font-size: 1rem;
 	line-height: 28px;
 	opacity: 0.7;
 	cursor: pointer;

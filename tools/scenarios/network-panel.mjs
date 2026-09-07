@@ -19,7 +19,7 @@
 
 const RUN = Date.now().toString(36);
 const NICK = `np${RUN}`; // 10 characters: an ordinary nick, must fit whole
-const LONG_NICK = `npanel${RUN}`; // 14: what the toolbar leaves no room for
+const LONG_NICK = `npanel${RUN}`; // 14: proves a /nick reaches the header and the tools stay put
 const BASE = "http://localhost:8001/";
 
 export const url = `${BASE}?host=127.0.0.1&port=8067&tls=false&nick=${NICK}&join=%23seance`;
@@ -97,7 +97,7 @@ export default async function run(page) {
 			`nick ends at the right edge (${Math.round(lobbyRight - nickRight)}px from it)`,
 			lobbyRight - nickRight >= 10 && lobbyRight - nickRight <= 20
 		);
-		page.check(`header height is modest (${Math.round(lobby.height)}px)`, lobby.height <= 60);
+		page.check(`header height is modest (${Math.round(lobby.height)}px)`, lobby.height <= 72);
 	}
 
 	// The toolbar is evenly spaced: same box for every tool, same pitch

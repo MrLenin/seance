@@ -291,7 +291,7 @@ the server tab on new connection"
 }
 
 #connect.network-form-embedded h1 {
-	font-size: 28px;
+	font-size: 1.75rem;
 }
 
 #connect .connect-row.connect-auth .opt {

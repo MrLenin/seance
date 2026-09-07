@@ -82,9 +82,10 @@ adds a red dot, which is legible at 16px even when the artwork under it is not, 
   critical path (`logo-art-wide.png` is unreferenced; the 512 icon is fetched only on
   install), but both would benefit from `pngquant`/`oxipng`, which are not on the dev
   box.
-- **`theme-color` is still `#415364`**, TheLounge's slate, matching the app's
-  `--body-bg-color`. The icon tiles are `#0D0E14`. Changing it would recolour the
-  browser chrome and the PWA splash, so it is left as a separate decision.
+- **`theme-color` defaults to `#1a1816`**, the `coffee` theme's chrome tone (it was
+  TheLounge's slate `#415364` until the theme became the default; `day` still has that
+  as its `--body-bg-color`). The icon tiles are `#0D0E14`. A deploy sets its own with
+  `themeColor` in `config.json`, and `coffee`/`creama` set theirs once picked.
 
 ## Regenerating
 

@@ -8,6 +8,9 @@ const defaultSettingConfig = {
 	sync: null,
 };
 
+const buildThemeColor =
+	document.querySelector('meta[name="theme-color"]')?.getAttribute("content") || "";
+
 const defaultConfig = {
 	advanced: {
 		default: false,
@@ -72,18 +75,20 @@ const defaultConfig = {
 	pushKeyChange: {
 		default: "ask",
 	},
-	// Message text size (the chat area, input and user list). The scale and
-	// its normalization live in helpers/fontSize.ts; the pixel values live in
-	// style.css, keyed off <html data-font-size="...">, so themes and the
-	// custom stylesheet can override them.
+	// UI scale: the root font size everything in style.css is sized off in
+	// rem. The scale and its normalization live in helpers/fontSize.ts; the
+	// values live in style.css, keyed off <html data-font-size="...">, so
+	// themes and the custom stylesheet can override them.
 	fontSize: {
-		default: "medium",
+		default: "large",
 		apply(store: TypedStore, value: string) {
 			document.documentElement.dataset.fontSize = normalizeFontSize(value);
 		},
 	},
 	theme: {
 		default: document.getElementById("theme")?.dataset.serverTheme,
+		// One-time note of the tag's build-time colour, before boot applies
+		// anything: the fallback for themes that carry no colour of their own.
 		apply(store: TypedStore, value: string) {
 			const themeEl = document.getElementById("theme");
 			const themeUrl = `themes/${value}.css`;
@@ -118,10 +123,11 @@ const defaultConfig = {
 				throw new Error("theme meta element is not a meta element");
 			}
 
-			if (metaSelector) {
-				const themeColor = newTheme.themeColor || metaSelector.content;
-				metaSelector.content = themeColor;
-			}
+			// A theme without a colour of its own (day, morning) hands the
+			// browser chrome back to the deploy: config.json's themeColor, else
+			// the colour the build put in the tag.
+			metaSelector.content =
+				newTheme?.themeColor || store.state.branding.themeColor || buildThemeColor;
 		},
 	},
 	media: {

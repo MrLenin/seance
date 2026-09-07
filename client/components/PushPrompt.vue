@@ -62,7 +62,7 @@
 }
 
 #push-prompt .confirm-text-title {
-	font-size: 20px;
+	font-size: 1.25rem;
 	font-weight: 700;
 	margin-bottom: 10px;
 }
