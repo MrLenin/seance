@@ -1,0 +1,128 @@
+/* Creama — "Ink & Amber", light: coffee.css with the chat surface inverted to
+ * paper. The rail stays dark (a shade lighter than coffee's) and every rule
+ * is coffee's, so this file is the token values alone plus the three mIRC
+ * colours coffee brightens for a dark surface.
+ *
+ * Where the handoff's light values fall under its own 4.5:1 rule they are
+ * darkened here, checked on --chat-bg: muted text #8a8075 → #776d62 (3.8 →
+ * 4.9), the amber for links and buttons #b4741a → #9d6514 (3.7 → 4.7), the
+ * join green #7d9a4a → #5f8033 (3.1 → 4.4, an icon), placeholders #a89e91 →
+ * #978d80 (2.6 → 3.2). The badge keeps the handoff's brighter amber, it sits
+ * on the dark rail. The nick palette is 32 slots at ≥ 5:1 on --chat-bg so it
+ * still clears 4.5:1 on a highlighted row. */
+@import "coffee.css";
+
+:root {
+	color-scheme: light;
+
+	/* Chat surface */
+	--chat-bg: #fdfbf7;
+	--chat-fg: #2a2521;
+	--chat-fg-muted: #776d62;
+	--chat-fg-faint: #978d80;
+	--chat-heading: #7a7166;
+	--chat-rule: #ece5d9;
+	--chat-accent: #9d6514;
+	--chat-accent-fg: #fdfbf7;
+	--chat-accent-rule: rgb(180 116 26 / 50%);
+	--chat-highlight-bg: #f8f0e6;
+	--chat-selection: #eeddca;
+	--composer-bg: #f7f3ea;
+	--composer-border: #e3dccd;
+	--titlebar-bg: #efe9de;
+	--window-border: #e3ddd1;
+	--window-shadow: 0 0 25px rgb(0 0 0 / 40%);
+	--menu-bg: #fdfbf7;
+
+	/* Sidebar rail */
+	--rail-bg-top: #2e2823;
+	--rail-bg-bottom: #211c19;
+	--rail-fg: #cfc5b8;
+	--rail-fg-strong: #f0e7da;
+	--rail-fg-active: #fbf6ee;
+	--rail-fg-muted: #9a9084;
+	--rail-item-active-bg: #3b322b;
+	--rail-item-hover-bg: rgb(59 50 43 / 60%);
+	--rail-accent: #d99a2b;
+	--rail-accent-fg: #211c19;
+	--rail-badge-bg: #3f362e;
+	--rail-badge-fg: #e9dfd0;
+	--rail-input-bg: #1b1714;
+	--rail-input-border: #3c342d;
+
+	/* Message semantics */
+	--event-join: #5f8033;
+	--event-quit: #a4472e;
+	--nick-default: #9c5f13;
+	--notice-color: #707102;
+	--action-color: #a25b25;
+
+	/* Notice boxes */
+	--note-bg: #f1ece2;
+	--note-fg: #5c5247;
+	--warn-bg: #fbf1d9;
+	--warn-fg: #7a5a14;
+	--error-bg: #f8e4df;
+	--error-fg: #8f3a24;
+	--ok-bg: #e9efdc;
+	--ok-fg: #4c6a25;
+
+	/* Tints, focus ring, scrollbars */
+	--tint-soft: rgb(0 0 0 / 4%);
+	--tint-strong: rgb(0 0 0 / 8%);
+	--accent-tint-20: rgb(157 101 20 / 18%);
+	--accent-tint-30: rgb(157 101 20 / 28%);
+	--focus-ring: rgb(157 101 20 / 45%);
+	--scrollbar-track: rgb(42 37 33 / 9%);
+	--scrollbar-thumb: rgb(42 37 33 / 45%);
+	--scrollbar-thumb-active: rgb(42 37 33 / 60%);
+
+	/* Code blocks */
+	--tok-comment: #8a8075;
+	--tok-keyword: #a4472e;
+	--tok-string: #707102;
+	--tok-number: #9c5f13;
+	--tok-function: #7c5fa8;
+	--tok-operator: #a4472e;
+	--tok-punctuation: #6c6258;
+	--tok-tag: #50782b;
+	--tok-attr: #a25b25;
+}
+
+.user.color-1 { color: #aa5255; }
+.user.color-2 { color: #a95446; }
+.user.color-3 { color: #a75736; }
+.user.color-4 { color: #a25b25; }
+.user.color-5 { color: #9c5f13; }
+.user.color-6 { color: #936400; }
+.user.color-7 { color: #886802; }
+.user.color-8 { color: #7d6d00; }
+.user.color-9 { color: #707102; }
+.user.color-10 { color: #61741a; }
+.user.color-11 { color: #50782b; }
+.user.color-12 { color: #3c7a3c; }
+.user.color-13 { color: #217c4b; }
+.user.color-14 { color: #047c5b; }
+.user.color-15 { color: #087b69; }
+.user.color-16 { color: #007a74; }
+.user.color-17 { color: #29777c; }
+.user.color-18 { color: #2c7684; }
+.user.color-19 { color: #33758b; }
+.user.color-20 { color: #3c7391; }
+.user.color-21 { color: #467196; }
+.user.color-22 { color: #506e98; }
+.user.color-23 { color: #5b6c9a; }
+.user.color-24 { color: #646a99; }
+.user.color-25 { color: #6e6798; }
+.user.color-26 { color: #7c5fa8; }
+.user.color-27 { color: #885ba1; }
+.user.color-28 { color: #915897; }
+.user.color-29 { color: #9a558c; }
+.user.color-30 { color: #a0537f; }
+.user.color-31 { color: #a55272; }
+.user.color-32 { color: #a85263; }
+
+/* style.css's mIRC values again: coffee brightens these for its dark surface. */
+.irc-fg2 { color: #001f3f; }
+.irc-fg5 { color: #85144b; }
+.irc-fg12 { color: #0074d9; }

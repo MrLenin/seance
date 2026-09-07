@@ -67,8 +67,10 @@ describe("public folder", function () {
 	it("style files are built", function () {
 		expect(fs.existsSync(path.join(publicFolder, "css", "style.css"))).to.be.true;
 		expect(fs.existsSync(path.join(publicFolder, "css", "style.css.map"))).to.be.true;
-		expect(fs.existsSync(path.join(publicFolder, "themes", "default.css"))).to.be.true;
-		expect(fs.existsSync(path.join(publicFolder, "themes", "morning.css"))).to.be.true;
+
+		for (const theme of ["coffee", "creama", "day", "morning"]) {
+			expect(fs.existsSync(path.join(publicFolder, "themes", `${theme}.css`))).to.be.true;
+		}
 	});
 
 	it("style files contain expected content", function (done) {

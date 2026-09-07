@@ -5,8 +5,8 @@
 	"start_url": "./",
 	"scope": "./",
 	"display": "standalone",
-	"theme_color": "#415364",
-	"background_color": "#415364",
+	"theme_color": "#1a1816",
+	"background_color": "#1a1816",
 	"categories": ["social", "communication"],
 	"launch_handler": {
 		"client_mode": "focus-existing"

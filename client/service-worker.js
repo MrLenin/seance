@@ -80,7 +80,7 @@ const shellPaths = [
 	`js/bundle.js?v=${cacheName}`,
 	`js/push.js?v=${cacheName}`,
 	`css/style.css?v=${cacheName}`,
-	"themes/default.css",
+	"themes/coffee.css",
 	"fonts/fa-solid-900.woff2",
 	"img/logo-tile.png",
 ];

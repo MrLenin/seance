@@ -23,11 +23,16 @@ const configuration: SharedConfiguration = {
 	applicationServerKey: "",
 	version: process.env.SEANCE_VERSION || pkg.version,
 	gitCommit: null,
+	// One CSS file each under client/themes/; docs/resources/themes.md. The
+	// two Ink & Amber themes carry their titlebar tone as the browser chrome
+	// colour, the older two leave it to the deploy's themeColor.
 	themes: [
-		{name: "default", displayName: "Default", themeColor: null},
+		{name: "coffee", displayName: "Coffee", themeColor: "#1a1816"},
+		{name: "creama", displayName: "Creama", themeColor: "#efe9de"},
+		{name: "day", displayName: "Day", themeColor: null},
 		{name: "morning", displayName: "Morning", themeColor: null},
 	],
-	defaultTheme: "default",
+	defaultTheme: "coffee",
 	lockNetwork: false,
 	defaults: {
 		name: "",
