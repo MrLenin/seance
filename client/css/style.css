@@ -3011,6 +3011,16 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	flex: 1 0 auto;
 	align-self: center;
 	touch-action: pan-y;
+	caret-color: var(--link-color);
+}
+
+/* The composer shows that it holds the caret — ChatInput.vue puts it there
+   when a conversation opens, and a caret alone is a thin blinking line in the
+   text colour that is easy to miss: while anything in the form has focus its
+   top edge takes the input focus colour (the caret above takes the accent). */
+#form:focus-within {
+	border-top-color: #84ce88;
+	box-shadow: inset 0 2px 0 rgb(132 206 136 / 50%);
 }
 
 #form #upload-input {

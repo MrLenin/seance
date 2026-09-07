@@ -456,6 +456,17 @@ kbd {
 	color: var(--chat-fg);
 }
 
+/* The handoff's focus ring on the composer ("Interaction states": 2px accent
+   at 60%): the bar is flush with the window, so the ring is its top edge. */
+#form:focus-within {
+	border-top-color: var(--chat-accent);
+	box-shadow: inset 0 2px 0 var(--focus-ring);
+}
+
+#form #input {
+	caret-color: var(--chat-accent);
+}
+
 #form #nick {
 	background: var(--chat-bg);
 	color: var(--chat-fg-muted);
