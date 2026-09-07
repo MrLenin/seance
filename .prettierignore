@@ -43,4 +43,3 @@ shells/capacitor/ios/
 .claude-config/
 .llama-stats.log
 testnet/
-*.zip
