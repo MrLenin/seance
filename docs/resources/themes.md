@@ -29,4 +29,4 @@ The rail gradient is on `body` as well as `#sidebar`, so the gutter `day.css` ke
 
 ## Checking a theme
 
-`yarn test` never loads a stylesheet. Build, serve `public/`, and look (`docs/resources/browser-testing.md`); the Appearance dropdown switches live. For contrast, `tools/scenarios/reaction-picker.mjs` shows the pattern of measuring a computed colour pair in the page.
+`yarn test` never loads a stylesheet. Build, serve `public/`, and look (`docs/resources/browser-testing.md`); the Appearance dropdown switches live. `tools/scenarios/themes.mjs` drives that dropdown through every theme against the dev ircd, checks the stylesheet link, the stored name and the browser chrome colour, measures the Ink & Amber pairs above (text, timestamps, links, the join line, a nick on a highlighted row at ≥ 4.5:1; icons and the placeholder at ≥ 3:1) from computed styles, and leaves a screenshot of the chat under each theme.

@@ -7,7 +7,7 @@
  * darkened here, checked on --chat-bg: muted text #8a8075 → #776d62 (3.8 →
  * 4.9), the amber for links and buttons #b4741a → #9d6514 (3.7 → 4.7), the
  * join green #7d9a4a → #5f8033 (3.1 → 4.4, an icon), placeholders #a89e91 →
- * #978d80 (2.6 → 3.2). The badge keeps the handoff's brighter amber, it sits
+ * #8f857a (2.6 → 3.3 on the input strip, where they sit). The badge keeps the handoff's brighter amber, it sits
  * on the dark rail. The nick palette is 32 slots at ≥ 5:1 on --chat-bg so it
  * still clears 4.5:1 on a highlighted row. */
 @import "coffee.css";
@@ -19,7 +19,7 @@
 	--chat-bg: #fdfbf7;
 	--chat-fg: #2a2521;
 	--chat-fg-muted: #776d62;
-	--chat-fg-faint: #978d80;
+	--chat-fg-faint: #8f857a;
 	--chat-heading: #7a7166;
 	--chat-rule: #ece5d9;
 	--chat-accent: #9d6514;
@@ -29,7 +29,6 @@
 	--chat-selection: #eeddca;
 	--composer-bg: #f7f3ea;
 	--composer-border: #e3dccd;
-	--titlebar-bg: #efe9de;
 	--window-border: #e3ddd1;
 	--window-shadow: 0 0 25px rgb(0 0 0 / 40%);
 	--menu-bg: #fdfbf7;

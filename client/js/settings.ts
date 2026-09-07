@@ -8,6 +8,9 @@ const defaultSettingConfig = {
 	sync: null,
 };
 
+const buildThemeColor =
+	document.querySelector('meta[name="theme-color"]')?.getAttribute("content") || "";
+
 const defaultConfig = {
 	advanced: {
 		default: false,
@@ -84,6 +87,8 @@ const defaultConfig = {
 	},
 	theme: {
 		default: document.getElementById("theme")?.dataset.serverTheme,
+		// One-time note of the tag's build-time colour, before boot applies
+		// anything: the fallback for themes that carry no colour of their own.
 		apply(store: TypedStore, value: string) {
 			const themeEl = document.getElementById("theme");
 			const themeUrl = `themes/${value}.css`;
@@ -118,10 +123,11 @@ const defaultConfig = {
 				throw new Error("theme meta element is not a meta element");
 			}
 
-			if (metaSelector) {
-				const themeColor = newTheme.themeColor || metaSelector.content;
-				metaSelector.content = themeColor;
-			}
+			// A theme without a colour of its own (day, morning) hands the
+			// browser chrome back to the deploy: config.json's themeColor, else
+			// the colour the build put in the tag.
+			metaSelector.content =
+				newTheme?.themeColor || store.state.branding.themeColor || buildThemeColor;
 		},
 	},
 	media: {

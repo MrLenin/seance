@@ -81,6 +81,7 @@ const shellPaths = [
 	`js/push.js?v=${cacheName}`,
 	`css/style.css?v=${cacheName}`,
 	"themes/coffee.css",
+	"themes/day.css", // coffee.css @imports it (the window frame)
 	"fonts/fa-solid-900.woff2",
 	"img/logo-tile.png",
 ];
