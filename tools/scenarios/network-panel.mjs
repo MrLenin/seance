@@ -128,6 +128,45 @@ export default async function run(page) {
 		)
 	);
 
+	// Even boxes are not what the eye measures: the gaps between the glyphs'
+	// ink are. Measure each glyph with a canvas in the font, size and centring
+	// the page uses, and require the ink widths and the ink-to-ink gaps to
+	// match — a thin text "+" or a smaller bell would fail this while every
+	// box check above still passed.
+	const ink = await page.evaluate(`(() => {
+		const ctx = document.createElement("canvas").getContext("2d");
+		return ${JSON.stringify(TOOLS)}.map((sel) => {
+			const el = document.querySelector('${LOBBY} .lobby-tools ' + sel);
+			const box = el.getBoundingClientRect();
+			const ps = getComputedStyle(el, "::before");
+			const content = JSON.parse(ps.content.replace(/^'(.*)'$/, '"$1"'));
+			ctx.font = ps.fontStyle + " " + ps.fontWeight + " " + ps.fontSize + " " + ps.fontFamily;
+			ctx.textAlign = "center";
+			const m = ctx.measureText(content);
+			const centre = box.x + box.width / 2;
+			return {
+				left: centre - m.actualBoundingBoxLeft,
+				right: centre + m.actualBoundingBoxRight,
+				width: m.actualBoundingBoxLeft + m.actualBoundingBoxRight,
+				family: ps.fontFamily,
+			};
+		});
+	})()`);
+	const inkWidths = ink.map((g) => Math.round(g.width * 10) / 10);
+	const inkGaps = ink.slice(1).map((g, i) => Math.round((g.left - ink[i].right) * 10) / 10);
+	page.check(
+		`glyphs are the same size (ink ${inkWidths.join("/")}px)`,
+		Math.max(...inkWidths) - Math.min(...inkWidths) <= 2
+	);
+	page.check(
+		`gaps between glyphs are equal (${inkGaps.join("/")}px)`,
+		Math.max(...inkGaps) - Math.min(...inkGaps) <= 1.5
+	);
+	page.check(
+		"every glyph comes from the icon font",
+		ink.every((g) => /FontAwesome/.test(g.family))
+	);
+
 	page.check("name is not clipped", await unclipped(`${LOBBY} .lobby-title .name`));
 	page.check("an ordinary nick is not clipped", await unclipped(`${LOBBY} .lobby-nick`));
 	const shownName = await page.evaluate(text(`${LOBBY} .lobby-title .name`));
