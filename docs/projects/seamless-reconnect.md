@@ -486,24 +486,38 @@ sidebar collapsed — nothing pushy or in the way.
   computed from `network.status`, which `socket-events/network.ts` updates on
   every `network:status`, so it clears the moment the network registers.
 - **Connection strip** (`ChatInput.vue` `showConnectionBar`, `.connection-bar`):
-  a row above the input in the family of the reply and upload strips.
-  While `status.connecting` — a dial or the wait before a retry — it shows a
-  turning sync glyph and `Connecting to <network>…`; when nothing is being
-  tried (the user cancelled with `/disconnect`, or a rejection ended it) it
-  shows `Disconnected from <network>.` and a Connect button that sends the
-  same `/connect` as the sidebar's status icon. It is `role="status" aria-live="polite"`, so assistive technology announces the change once; no
-  sound, no vibration, nothing modal. On a phone it sits right above the
-  keyboard, whatever the sidebar is doing; the header spinner stays as well.
+  a row above the input in the family of the reply and upload strips. While
+  the transport waits for its next retry it counts the wait down —
+  `Reconnecting to <network> in 12s…` — with a "Connect now" button; while a
+  dial is in flight it shows a turning sync glyph and
+  `Connecting to <network>…`; when nothing is being tried (the user cancelled
+  with `/disconnect`, or a rejection ended it) it shows
+  `Disconnected from <network>.` and a Connect button. Both buttons send the
+  same `/connect` as the sidebar's status icon, which restarts the schedule
+  (round seven). It is `role="status" aria-live="polite"`, so assistive
+  technology announces the change once; no sound, no vibration, nothing
+  modal. On a phone it sits right above the keyboard, whatever the sidebar is
+  doing; the header spinner stays as well.
+- **`network:status.retryAt`** (bus-contract § 1.1): the close that schedules
+  a retry carries the transport's `delayMs` as an epoch time, and the status
+  the retry's start sends drops it again — so it is set exactly while there
+  is a wait to count, never during a dial, after registration or once
+  `/disconnect` cancelled the retry. `IrcClient.status` builds every
+  `network:status` from the same fields (`announceStatus`), and the store
+  consumer deletes the key when it is absent, so a snapshot without a pending
+  retry has no `retryAt` at all. `ChatInput.vue` keeps a half-second ticker
+  while the strip shows and reads the seconds off it. Test:
+  `test/irc/client.ts` § "says when the retry is due".
 
-Not done, and why: a countdown in the strip (the store carries no retry
-delay, and after round seven the waits a user is looking at are short); a
-vibration or sound (pushy, and the OS decides whether a background page may).
+Not done, and why: a vibration or sound (pushy, and the OS decides whether a
+background page may).
 
-Browser check: `tools/scenarios/disconnected-channel.mjs` (18 checks: the
-three states, the draft kept through Enter, `/connect` sendable, the Connect
-button dialling, everything clearing on registration and a message going
-out), through `tools/scenarios/lib/irc-proxy.mjs` — the proxy of round
-seven, now shared. Run it on the phone layout as well:
+Browser check: `tools/scenarios/disconnected-channel.mjs` (20 checks: the
+three states, the countdown and its "Connect now", the draft kept through
+Enter, `/connect` sendable, the Connect button dialling, everything clearing
+on registration and a message going out), through
+`tools/scenarios/lib/irc-proxy.mjs` — the proxy of round seven, now shared.
+Run it on the phone layout as well:
 
 ```sh
 node tools/browser-drive.mjs tools/scenarios/disconnected-channel.mjs --chrome=…

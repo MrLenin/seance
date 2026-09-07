@@ -131,7 +131,10 @@ async function check(page, proxy) {
 	});
 	await page.sleep(FADE_MS);
 	const said = await barText(page);
-	page.check(`2. the strip says what is happening (${said})`, /^Connecting to .+…$/.test(said));
+	page.check(
+		`2. the strip says what is happening (${said})`,
+		/^(Connecting to .+…|Reconnecting to .+ in \d+s…)$/.test(said)
+	);
 	page.check(
 		"2. the strip is a polite live region",
 		await page.evaluate(
@@ -145,6 +148,34 @@ async function check(page, proxy) {
 	);
 	page.check("2. the sidebar row fades", (await opacityOf(page, ROW)) < 1);
 	await page.screenshot("2-down");
+
+	// 2b. Between dials the strip counts the wait down and offers to skip it.
+	await page.waitFor(barSays("/^Reconnecting to .+ in \\d+s…$/"), {
+		timeout: 12000,
+		label: "the countdown",
+	});
+	page.check(
+		"2. the wait counts down with a Connect now button",
+		(await page.evaluate(
+			`(document.querySelector(${JSON.stringify(
+				`${BAR} .connection-bar-connect`
+			)}) || {textContent: ""}).textContent.trim()`
+		)) === "Connect now"
+	);
+	// A dial the proxy refuses fails within milliseconds, so what shows after
+	// the click is the restarted schedule (1 s), not the dial itself.
+	await page.waitFor(barSays("/^Reconnecting to .+ in [3-9]\\d*s…$/"), {
+		timeout: 15000,
+		label: "a longer countdown",
+	});
+	await page.screenshot("2b-countdown");
+	await page.click(`${BAR} .connection-bar-connect`);
+	await page.sleep(300);
+	const after = await barText(page);
+	page.check(
+		`2. Connect now dials at once and restarts the schedule (${after})`,
+		/^Connecting to /.test(after) || /in 1s…$/.test(after)
+	);
 
 	// 3. Typing is allowed; Enter with plain text sends nothing and keeps the
 	// draft; a slash command is still sendable.
@@ -171,17 +202,20 @@ async function check(page, proxy) {
 	);
 	await page.screenshot("4-idle");
 	await page.click(`${BAR} .connection-bar-connect`);
-	await page.waitFor(barSays("/^Connecting to /"), {
-		timeout: 5000,
-		label: "the dial after Connect",
-	});
-	page.check("4. Connect dials again", true);
+	await page.sleep(300);
+	const dialled = await barText(page);
+	page.check(
+		`4. Connect dials again (${dialled})`,
+		/^Connecting to /.test(dialled) || /^Reconnecting to .+ in \d+s…$/.test(dialled)
+	);
 
 	// 5. The radio is back: the next retry registers and everything clears.
+	// (A dial refused just before the switch reports its error late, so the
+	// errors stay expected until the registration is in.)
 	proxy.accept();
-	page.expectWsErrors = false;
 	const frames = page.wsFrames.length;
 	await until(page, () => registered(page, frames), 15000, "the re-registration");
+	page.expectWsErrors = false;
 	await page.waitFor(`!document.querySelector(${JSON.stringify(BAR)})`, {
 		timeout: 5000,
 		label: "the strip to go",

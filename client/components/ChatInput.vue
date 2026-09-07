@@ -3,17 +3,20 @@
 		<TypingIndicator :channel="channel" />
 		<div v-if="showConnectionBar" class="connection-bar" role="status" aria-live="polite">
 			<span
-				:class="['connection-bar-icon', {spinning: network.status.connecting}]"
+				:class="[
+					'connection-bar-icon',
+					{spinning: network.status.connecting && retryInSeconds === 0},
+				]"
 				aria-hidden="true"
 			></span>
 			<span class="connection-bar-label">{{ connectionLabel }}</span>
 			<button
-				v-if="!network.status.connecting"
+				v-if="canConnectNow"
 				type="button"
 				class="connection-bar-connect"
 				@click="connectNetwork"
 			>
-				Connect
+				{{ network.status.connecting ? "Connect now" : "Connect" }}
 			</button>
 		</div>
 		<div
@@ -260,13 +263,61 @@ export default defineComponent({
 				props.channel.pendingMessage.startsWith("/")
 		);
 
+		// The wait before the transport's next retry (`status.retryAt`) counts
+		// down here — a tick every half second while the strip shows — and
+		// "Connect now" skips it (`/connect` restarts the schedule).
+		const now = ref(Date.now());
+		let ticker: ReturnType<typeof setInterval> | null = null;
+
+		const retryInSeconds = computed(() => {
+			const at = props.network.status.retryAt;
+
+			if (!props.network.status.connecting || at === undefined) {
+				return 0;
+			}
+
+			return Math.max(0, Math.ceil((at - now.value) / 1000));
+		});
+
 		const connectionLabel = computed(() => {
 			const name = props.network.name || "the network";
 
-			return props.network.status.connecting
-				? `Connecting to ${name}…`
-				: `Disconnected from ${name}.`;
+			if (!props.network.status.connecting) {
+				return `Disconnected from ${name}.`;
+			}
+
+			return retryInSeconds.value > 0
+				? `Reconnecting to ${name} in ${retryInSeconds.value}s…`
+				: `Connecting to ${name}…`;
 		});
+
+		// Idle, or waiting for a retry: a dial in flight offers nothing.
+		const canConnectNow = computed(
+			() => !props.network.status.connecting || retryInSeconds.value > 0
+		);
+
+		watch(
+			showConnectionBar,
+			(shown) => {
+				if (shown && ticker === null) {
+					now.value = Date.now();
+					ticker = setInterval(() => {
+						now.value = Date.now();
+					}, 500);
+				} else if (!shown && ticker !== null) {
+					clearInterval(ticker);
+					ticker = null;
+				}
+			},
+			{immediate: true}
+		);
+
+		watch(
+			() => props.network.status.retryAt,
+			() => {
+				now.value = Date.now();
+			}
+		);
 
 		// The same `/connect` the sidebar's status icon sends; any window of
 		// the network routes to its client.
@@ -664,6 +715,11 @@ export default defineComponent({
 		});
 
 		onUnmounted(() => {
+			if (ticker !== null) {
+				clearInterval(ticker);
+				ticker = null;
+			}
+
 			eventbus.off("escapekey", blurInput);
 
 			if (autocompletionRef.value) {
@@ -699,6 +755,8 @@ export default defineComponent({
 			showConnectionBar,
 			canSend,
 			connectionLabel,
+			retryInSeconds,
+			canConnectNow,
 			connectNetwork,
 		};
 	},
