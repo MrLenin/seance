@@ -82,31 +82,36 @@
 	/* Color the sidebar channel icon pulses to just after someone spoke there */
 	--channel-activity-color: #7fb8e8;
 
-	/* Message text size: the chat area, the input and the user list. The
-	 * Appearance settings slider picks one of the html[data-font-size] scales
-	 * below; "medium" is this default. */
-	--user-font-size: 14px;
+	/* The UI scale. Everything is sized in rem off this one value — messages,
+	 * sidebar, header, buttons, menus, badges — so the font-size setting
+	 * (Settings → Appearance; client/js/helpers/fontSize.ts) grows the whole
+	 * interface together. The steps below are percentages of the browser's
+	 * default font size rather than pixels, so a user who raised that in
+	 * their browser gets a bigger client too. "large" is the default and
+	 * equals the browser default (16px unless changed); "medium" is the 14px
+	 * the client used to ship with. */
+	font-size: 100%;
 }
 
 /* The font-size setting's scale (client/js/helpers/fontSize.ts). */
 html[data-font-size="tiny"] {
-	--user-font-size: 10px;
+	font-size: 62.5%;
 }
 
 html[data-font-size="small"] {
-	--user-font-size: 12px;
+	font-size: 75%;
 }
 
-html[data-font-size="large"] {
-	--user-font-size: 16px;
+html[data-font-size="medium"] {
+	font-size: 87.5%;
 }
 
 html[data-font-size="xlarge"] {
-	--user-font-size: 18px;
+	font-size: 112.5%;
 }
 
 html[data-font-size="huge"] {
-	--user-font-size: 21px;
+	font-size: 131.25%;
 }
 
 ::placeholder {
@@ -161,7 +166,7 @@ body {
 body {
 	background: var(--body-bg-color);
 	color: var(--body-color);
-	font: 16px -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+	font: 1rem -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 	margin: 0;
 	user-select: none;
 	cursor: default;
@@ -223,7 +228,7 @@ textarea#user-specified-css-input {
 
 code,
 .irc-monospace {
-	font-size: 13px;
+	font-size: 0.9em;
 	padding: 2px 4px;
 	color: #e74c3c;
 	background-color: #f9f2f4;
@@ -234,7 +239,7 @@ pre {
 	display: block;
 	padding: 9.5px;
 	margin: 0 0 10px;
-	font-size: 13px;
+	font-size: 0.9em;
 	line-height: 1.4286;
 	color: #333;
 	word-break: break-all;
@@ -247,7 +252,7 @@ kbd {
 	display: inline-block;
 	font-family: inherit;
 	line-height: 1em;
-	min-width: 28px; /* Ensure 1-char keys have the same width */
+	min-width: 1.75em; /* Ensure 1-char keys have the same width */
 	margin: 0 1px;
 	padding: 4px 6px;
 	color: #444;
@@ -269,19 +274,19 @@ p {
 	border-radius: 3px;
 	color: var(--button-color);
 	display: inline-block;
-	font-size: 12px;
+	font-size: 0.875rem;
 	font-weight: bold;
-	letter-spacing: 1px;
+	letter-spacing: 0.06em;
 	margin-bottom: 10px;
-	padding: 9px 17px;
+	padding: 0.75em 1.5em;
 	text-transform: uppercase;
 	transition: background 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s;
-	word-spacing: 3px;
+	word-spacing: 0.2em;
 	cursor: pointer; /* This is useful for `<button>` elements */
 }
 
 .btn-small {
-	padding: 5px 13px;
+	padding: 0.4em 1em;
 }
 
 .btn:disabled,
@@ -308,7 +313,7 @@ p {
 }
 
 .btn-sm {
-	padding: 4px 8px;
+	padding: 0.3em 0.6em;
 	border-width: 1px;
 	letter-spacing: 0;
 	word-spacing: 0;
@@ -318,7 +323,7 @@ p {
 .container {
 	padding: 0 15px;
 	margin-bottom: 20px;
-	width: 480px;
+	width: 30rem;
 	align-self: center;
 	touch-action: pan-y;
 }
@@ -611,7 +616,7 @@ p {
 
 #chat .msg-statusmsg span::before,
 #chat .msg-shown-in-active span::before {
-	font-size: 10px;
+	font-size: 0.75em;
 	content: "\f06e"; /* https://fontawesome.com/icons/eye?style=solid */
 }
 
@@ -640,7 +645,7 @@ p {
 	content: "\f002"; /* http://fontawesome.io/icon/search/ */
 	position: absolute;
 	right: 13px;
-	line-height: 45px;
+	line-height: 3rem;
 }
 
 #connect .extra-help::before,
@@ -697,10 +702,10 @@ p {
 #chat button.close {
 	color: #607992;
 	display: flex;
-	font-size: 14px;
+	font-size: 1.0625rem;
 	line-height: 1;
-	height: 36px;
-	width: 36px;
+	height: 2.5rem;
+	width: 2.5rem;
 	flex-shrink: 0;
 }
 
@@ -710,8 +715,8 @@ p {
 #chat button.search::before,
 #chat button.menu::before,
 #chat button.close::before {
-	width: 36px;
-	line-height: 36px; /* Fix alignment in Microsoft Edge */
+	width: 2.5rem;
+	line-height: 2.5rem; /* Fix alignment in Microsoft Edge */
 }
 
 /* Channel list button stays fixed when scrolling... */
@@ -751,7 +756,7 @@ p {
 #sidebar {
 	display: none;
 	flex-direction: column;
-	width: 220px;
+	width: 16rem;
 	max-height: 100%;
 	will-change: transform;
 	color: #b7c5d1; /* same as .channel-list-item color */
@@ -775,7 +780,7 @@ p {
 }
 
 #sidebar .logo {
-	height: 45px;
+	height: 3rem;
 }
 
 #sidebar .devtools-toggle {
@@ -784,8 +789,8 @@ p {
 	border: 0;
 	border-radius: 4px;
 	background: transparent;
-	font-size: 14px;
-	line-height: 20px;
+	font-size: 0.875rem;
+	line-height: 1.25rem;
 	vertical-align: middle;
 	cursor: pointer;
 }
@@ -796,12 +801,12 @@ p {
 
 .channel-list-item,
 #sidebar .empty {
-	font-size: 14px;
+	font-size: 1rem;
 }
 
 .channel-list-item {
 	display: flex;
-	padding: 8px 14px;
+	padding: 0.625rem 0.875rem;
 	position: relative;
 	cursor: pointer;
 }
@@ -861,7 +866,7 @@ background on hover (unless active) */
 
 #sidebar .network {
 	position: relative;
-	margin-bottom: 20px;
+	margin-bottom: 1.25rem;
 	touch-action: pan-y;
 }
 
@@ -874,7 +879,7 @@ background on hover (unless active) */
 
 .channel-list-item[data-type="lobby"] {
 	color: #84ce88;
-	font-size: 15px;
+	font-size: 1.0625rem;
 	font-weight: bold;
 	padding-left: 0;
 }
@@ -912,9 +917,9 @@ background on hover (unless active) */
 }
 
 .channel-list-item::before {
-	width: 14px;
-	margin-right: 12px;
-	line-height: 18px;
+	width: 1em;
+	margin-right: 0.75em;
+	line-height: 1.2;
 }
 
 /* Someone is typing in this channel: breathe its icon between the color the
@@ -993,8 +998,8 @@ of one that has already passed — and only one `animation` can hold the icon. *
 	background: rgb(255 255 255 / 6%);
 	border-radius: 3px;
 	color: #afb6c0;
-	font-size: 10px;
-	padding: 4px 6px;
+	font-size: 0.75rem;
+	padding: 0.3em 0.5em;
 	transition: background-color 0.2s, color 0.2s;
 }
 
@@ -1016,17 +1021,17 @@ the same counter the badge shows). Muted channels keep their faded look. */
 }
 
 .channel-list-item .close {
-	width: 18px;
-	height: 18px;
+	width: 1.5rem;
+	height: 1.5rem;
 	display: none;
 	transition: opacity 0.2s, background-color 0.2s;
 }
 
 .channel-list-item .close::before {
-	font-size: 20px;
+	font-size: 1.25rem;
 	font-weight: normal;
 	display: inline-block;
-	line-height: 16px;
+	line-height: 1.5rem;
 	text-align: center;
 	content: "×";
 	color: #fff;
@@ -1043,17 +1048,17 @@ the same counter the badge shows). Muted channels keep their faded look. */
 
 .channel-list-item[data-type="lobby"] .add-channel {
 	border-radius: 3px;
-	width: 18px;
-	height: 18px;
+	width: 1.5rem;
+	height: 1.5rem;
 	opacity: 0.4;
 	transition: opacity 0.2s, background-color 0.2s, transform 0.2s;
 }
 
 .channel-list-item[data-type="lobby"] .add-channel::before {
-	font-size: 20px;
+	font-size: 1.25rem;
 	font-weight: normal;
 	display: inline-block;
-	line-height: 16px;
+	line-height: 1.5rem;
 	text-align: center;
 	content: "+";
 	color: #fff;
@@ -1070,8 +1075,8 @@ the same counter the badge shows). Muted channels keep their faded look. */
 
 .channel-list-item[data-type="lobby"] .edit-network {
 	border-radius: 3px;
-	width: 18px;
-	height: 18px;
+	width: 1.5rem;
+	height: 1.5rem;
 	margin-right: 4px;
 	opacity: 0.4;
 	transition: opacity 0.2s, background-color 0.2s;
@@ -1079,9 +1084,9 @@ the same counter the badge shows). Muted channels keep their faded look. */
 
 .channel-list-item[data-type="lobby"] .edit-network::before {
 	content: "\f013"; /* https://fontawesome.com/icons/cog?style=solid */
-	font-size: 13px;
+	font-size: 0.875rem;
 	display: inline-block;
-	line-height: 18px;
+	line-height: 1.5rem;
 	text-align: center;
 	color: #fff;
 }
@@ -1093,20 +1098,20 @@ the same counter the badge shows). Muted channels keep their faded look. */
 .channel-list-item .connection-status-tooltip {
 	flex-shrink: 0;
 	line-height: 1;
-	margin: 0 8px;
+	margin: 0 4px;
 }
 
 .channel-list-item .connection-status-icon {
-	width: 18px;
-	height: 18px;
+	width: 1.5rem;
+	height: 1.5rem;
 	opacity: 0.7;
 	transition: opacity 0.2s;
 }
 
 .channel-list-item .connection-status-icon::before {
-	font-size: 12px;
+	font-size: 0.875rem;
 	display: inline-block;
-	line-height: 18px;
+	line-height: 1.5rem;
 	text-align: center;
 }
 
@@ -1127,8 +1132,8 @@ the same counter the badge shows). Muted channels keep their faded look. */
 
 .channel-list-item .notify-status-icon {
 	display: inline-block;
-	width: 18px;
-	height: 18px;
+	width: 1.5rem;
+	height: 1.5rem;
 	opacity: 0.7;
 	transition: opacity 0.2s;
 }
@@ -1138,8 +1143,8 @@ the same counter the badge shows). Muted channels keep their faded look. */
 }
 
 .channel-list-item .notify-status-icon::before {
-	font-size: 11px;
-	line-height: 18px;
+	font-size: 0.8125rem;
+	line-height: 1.5rem;
 	text-align: center;
 }
 
@@ -1183,17 +1188,17 @@ the same counter the badge shows). Muted channels keep their faded look. */
 }
 
 #sidebar .network .collapse-network {
-	width: 40px;
+	width: 2.5rem;
 	opacity: 0.4;
-	padding-left: 11px;
+	padding-left: 0.6875rem;
 	transition: opacity 0.2s;
 	flex-shrink: 0;
 }
 
 #sidebar .network .collapse-network-icon {
 	display: block;
-	width: 20px;
-	height: 20px;
+	width: 1.25rem;
+	height: 1.25rem;
 	transition: transform 0.2s;
 }
 
@@ -1211,8 +1216,8 @@ the same counter the badge shows). Muted channels keep their faded look. */
 }
 
 #footer {
-	height: 45px;
-	font-size: 14px;
+	height: 3rem;
+	font-size: 1.0625rem;
 	flex-shrink: 0;
 	display: flex;
 	justify-content: center;
@@ -1221,7 +1226,7 @@ the same counter the badge shows). Muted channels keep their faded look. */
 #footer button {
 	color: #b7c5d1;
 	display: inline-block;
-	width: 45px;
+	width: 3rem;
 	height: 100%;
 	border-radius: 5px;
 }
@@ -1232,7 +1237,7 @@ the same counter the badge shows). Muted channels keep their faded look. */
 	bottom: 10px;
 	right: 7px;
 	padding: 2px;
-	font-size: 10px;
+	font-size: 0.7rem;
 	border-radius: 50%;
 	color: var(--link-color);
 	background: var(--body-bg-color);
@@ -1242,7 +1247,7 @@ the same counter the badge shows). Muted channels keep their faded look. */
 .window p,
 .window label,
 #settings .error {
-	font-size: 14px;
+	font-size: 1rem;
 }
 
 .input {
@@ -1250,14 +1255,14 @@ the same counter the badge shows). Muted channels keep their faded look. */
 	border: 1px solid #cdd3da;
 	border-radius: 2px;
 	color: #222;
-	font-size: 14px;
+	font-size: 1rem;
 	margin: 2px 0;
 	margin-bottom: 10px;
-	padding: 0 10px;
+	padding: 0 0.625rem;
 	transition: border-color 0.2s, box-shadow 0.2s;
 	width: 100%;
-	height: 35px;
-	line-height: 35px;
+	height: 2.5rem;
+	line-height: 2.5rem;
 }
 
 .input:disabled {
@@ -1271,7 +1276,7 @@ the same counter the badge shows). Muted channels keep their faded look. */
 
 textarea.input {
 	resize: vertical;
-	min-height: 35px;
+	min-height: 2.5rem;
 	padding: 6px 10px;
 	line-height: 1.5;
 }
@@ -1300,32 +1305,32 @@ textarea.input {
 }
 
 .window h1 {
-	font-size: 36px;
+	font-size: 2.25rem;
 }
 
 .window h2 {
 	border-bottom: 1px solid currentcolor;
 	color: var(--window-heading-color);
-	font-size: 22px;
+	font-size: 1.375rem;
 	margin: 30px 0 10px;
 	padding-bottom: 7px;
 }
 
 .window h2 small {
-	font-size: 16px;
+	font-size: 1rem;
 	line-height: 30px;
 }
 
 .window h3 {
 	color: var(--window-heading-color);
-	font-size: 18px;
+	font-size: 1.125rem;
 	margin: 20px 0 10px;
 }
 
 .header {
 	align-items: center;
-	line-height: 45px;
-	height: 45px;
+	line-height: 3rem;
+	height: 3rem;
 	padding: 0 6px;
 	display: flex;
 	flex-shrink: 0;
@@ -1346,10 +1351,10 @@ textarea.input {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	width: 36px;
-	height: 36px;
+	width: 2.5rem;
+	height: 2.5rem;
 	flex-shrink: 0;
-	font-size: 13px;
+	font-size: 0.9375rem;
 	color: var(--body-color-muted);
 	opacity: 0.65;
 	animation: connection-status-spin 1.5s linear infinite;
@@ -1363,7 +1368,7 @@ textarea.input {
 }
 
 .header .title {
-	font-size: 15px;
+	font-size: 1.0625rem;
 	padding-left: 6px;
 	flex-shrink: 1;
 	white-space: nowrap;
@@ -1383,7 +1388,7 @@ textarea.input {
 	word-break: break-all;
 	flex-grow: 1;
 	overflow: hidden;
-	font-size: 14px;
+	font-size: 0.9375rem;
 	flex-shrink: 99999999;
 	min-width: 25px;
 }
@@ -1397,27 +1402,27 @@ textarea.input {
 	background: transparent;
 	border: 1px solid #cdd3da;
 	border-radius: 2px;
-	padding-right: 37px;
-	padding-left: 10px;
+	padding-right: 2.5rem;
+	padding-left: 0.625rem;
 	width: 100%;
-	height: 35px;
+	height: 2.5rem;
 	overflow: hidden;
-	font-size: 14px;
+	font-size: 1rem;
 	line-height: normal;
 	outline: none;
 }
 
 .topic-container .save-topic {
 	position: absolute;
-	top: 6px;
+	top: 0.25rem;
 	right: 0;
 }
 
 .topic-container .save-topic span {
-	font-size: 16px;
+	font-size: 1.0625rem;
 	color: #607992;
-	width: 35px;
-	height: 35px;
+	width: 2.5rem;
+	height: 2.5rem;
 	display: flex;
 	justify-content: center;
 	align-items: center;
@@ -1478,16 +1483,8 @@ textarea.input {
 #form,
 .messages .msg,
 .userlist {
-	font-size: var(--user-font-size, 14px);
+	font-size: 1rem;
 	line-height: 1.4;
-}
-
-/* Inline code and code blocks track the message text: the global `code` rule
- * is a fixed 13px, which only matches the messages until the font-size
- * setting moves the base. 0.93em of the 14px default is that same 13px. */
-.messages .msg code,
-.messages .msg .irc-monospace {
-	font-size: 0.93em;
 }
 
 #chat .chat-content {
@@ -1512,7 +1509,7 @@ textarea.input {
 
 #chat .userlist {
 	border-left: 1px solid #e7e7e7;
-	width: 180px;
+	width: 12rem;
 	display: none;
 	flex-direction: column;
 	flex-shrink: 0;
@@ -1523,7 +1520,7 @@ textarea.input {
   * Toggled via JavaScript
   */
 #sidebar .join-form {
-	padding: 0 18px 8px;
+	padding: 0 1.125rem 0.5rem;
 }
 
 #sidebar .join-form .input {
@@ -1595,7 +1592,7 @@ textarea.input {
 }
 
 .userlist-open .chat-view[data-type="channel"] .scroll-down {
-	right: 196px;
+	right: calc(12rem + 1rem);
 }
 
 #chat .messages {
@@ -1621,7 +1618,7 @@ textarea.input {
 	margin: 0 10px;
 	z-index: 0;
 	font-weight: bold;
-	font-size: 12px;
+	font-size: 0.8125rem;
 }
 
 #chat .unread-marker::before {
@@ -1647,7 +1644,7 @@ textarea.input {
 	margin: 0 10px;
 	z-index: 0;
 	font-weight: bold;
-	font-size: 12px;
+	font-size: 0.8125rem;
 }
 
 #chat .date-marker::before {
@@ -1670,31 +1667,31 @@ textarea.input {
 #chat .time,
 #chat .from,
 #chat .content {
-	padding: 3px 0;
+	padding: 0.2em 0;
 	flex: 0 0 auto;
 }
 
 #chat .time {
 	color: var(--body-color-muted);
-	padding-left: 10px;
-	width: 55px;
+	padding-left: 0.625rem;
+	width: 3.5rem;
 	font-variant-numeric: tabular-nums;
 	box-sizing: content-box; /* highlights have a border-left */
 }
 
 #chat.time-12h .time,
 #chat.time-seconds .time {
-	width: 75px;
+	width: 4.75rem;
 }
 
 #chat.time-seconds.time-12h .time {
-	width: 90px;
+	width: 5.75rem;
 }
 
 #chat .from {
-	padding-right: 10px;
+	padding-right: 0.625rem;
 	text-align: right;
-	width: 134px;
+	width: 8.5rem;
 	overflow: hidden;
 	white-space: nowrap;
 	position: relative;
@@ -1703,8 +1700,8 @@ textarea.input {
 #chat .content {
 	flex: 1 1 auto;
 	min-width: 0;
-	padding-left: 10px;
-	padding-right: 6px;
+	padding-left: 0.625rem;
+	padding-right: 0.375rem;
 	border-left: 1px solid #f6f6f6;
 	overflow: hidden; /* Prevents Zalgo text to expand beyond messages */
 	text-align: left; /* so RTL text will still be aligned left, not right */
@@ -2091,7 +2088,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	border-radius: 9px;
 	background: rgb(127 127 127 / 16%);
 	color: var(--link-color);
-	font-size: 17px;
+	font-size: 1.0625rem;
 	transition: transform 0.15s, background-color 0.15s;
 }
 
@@ -2143,7 +2140,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 }
 
 #chat .media-veil-hint {
-	font-size: 12px;
+	font-size: 0.8125rem;
 	opacity: 0.65;
 }
 
@@ -2153,7 +2150,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	padding: 4px 10px;
 	border: 1px solid rgb(127 127 127 / 40%);
 	border-radius: 999px;
-	font-size: 11px;
+	font-size: 0.75rem;
 	font-weight: bold;
 	letter-spacing: 0.3px;
 	white-space: nowrap;
@@ -2171,7 +2168,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 
 #chat .media-veil-caret {
 	margin-left: 4px;
-	font-size: 10px;
+	font-size: 0.7rem;
 }
 
 #chat .media-veil-caret::before {
@@ -2217,10 +2214,10 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	width: 26px;
-	height: 26px;
+	width: 1.75rem;
+	height: 1.75rem;
 	border-radius: 50%;
-	font-size: 12px;
+	font-size: 0.8125rem;
 	color: #fff;
 	opacity: 0.85;
 	transition: opacity 0.15s, background-color 0.15s;
@@ -2320,7 +2317,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 
 #chat .userlist .count {
 	background: #fafafa;
-	height: 45px;
+	height: 3rem;
 	flex-shrink: 0;
 	position: relative;
 }
@@ -2332,8 +2329,8 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	background: none;
 	font: inherit;
 	outline: 0;
-	padding: 13px;
-	padding-right: 30px;
+	padding: 0.8125rem;
+	padding-right: 1.875rem;
 	width: 100%;
 }
 
@@ -2352,7 +2349,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 #chat .names .user {
 	display: block;
 	line-height: 1.6;
-	padding: 0 16px;
+	padding: 0 1rem;
 	white-space: nowrap;
 }
 
@@ -2366,7 +2363,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	display: block;
 	font-size: 0.85em;
 	line-height: 1.6;
-	padding: 5px 16px;
+	padding: 0.3125rem 1rem;
 	position: sticky;
 	top: 0;
 }
@@ -2401,7 +2398,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 
 #loading {
 	display: flex;
-	font-size: 14px;
+	font-size: 1rem;
 	height: 100%;
 }
 
@@ -2586,7 +2583,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 }
 
 #settings .trusted-hosts-clear {
-	font-size: 12px;
+	font-size: 0.8125rem;
 	color: var(--link-color);
 }
 
@@ -2598,7 +2595,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 #settings .trusted-hosts-help,
 #settings .trusted-hosts-empty {
 	margin: 4px 0 0;
-	font-size: 13px;
+	font-size: 0.875rem;
 	color: var(--body-color-muted);
 }
 
@@ -2608,7 +2605,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 
 #settings .trusted-group-title {
 	display: block;
-	font-size: 11px;
+	font-size: 0.75rem;
 	font-weight: bold;
 	letter-spacing: 0.5px;
 	text-transform: uppercase;
@@ -2625,7 +2622,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 }
 
 #settings .trusted-host-network {
-	font-size: 11px;
+	font-size: 0.75rem;
 	color: var(--body-color-muted);
 }
 
@@ -2640,17 +2637,17 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	padding: 3px 4px 3px 10px;
 	border: 1px solid rgb(127 127 127 / 40%);
 	border-radius: 999px;
-	font-size: 13px;
+	font-size: 0.875rem;
 }
 
 #settings .trusted-host-remove {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	width: 20px;
-	height: 20px;
+	width: 1.5rem;
+	height: 1.5rem;
 	border-radius: 50%;
-	font-size: 11px;
+	font-size: 0.75rem;
 	opacity: 0.6;
 	transition: opacity 0.15s, background-color 0.15s;
 }
@@ -2675,7 +2672,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 }
 
 #settings #play {
-	font-size: 14px;
+	font-size: 1rem;
 	transition: opacity 0.2s;
 	color: var(--window-heading-color);
 }
@@ -2726,10 +2723,10 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 }
 
 .password-container .reveal-password span {
-	font-size: 16px;
+	font-size: 1.0625rem;
 	color: #607992;
-	width: 35px;
-	height: 35px;
+	width: 2.5rem;
+	height: 2.5rem;
 	display: flex;
 	justify-content: center;
 	align-items: center;
@@ -2756,7 +2753,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 
 #help .help-item {
 	display: table-row;
-	font-size: 14px;
+	font-size: 1rem;
 }
 
 #help .help-item .subject,
@@ -2802,7 +2799,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 }
 
 .window#changelog h3 {
-	font-size: 20px;
+	font-size: 1.25rem;
 	border-bottom: 1px solid currentcolor;
 	color: var(--window-heading-color);
 	margin: 30px 0 10px;
@@ -2887,7 +2884,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	border-top: 1px solid #e7e7e7;
 	border-radius: 0;
 	margin: 0;
-	padding: 6px;
+	padding: 0.375rem;
 	background: white;
 	display: flex;
 	flex-wrap: wrap; /* .compose-bar (reply/edit) takes a row of its own */
@@ -2896,7 +2893,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 }
 
 #user-visible-error {
-	font-size: 14px;
+	font-size: 0.9375rem;
 	line-height: 1.5;
 	font-weight: 600;
 	padding: 10px;
@@ -2911,9 +2908,9 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 #form #nick {
 	background: #f6f6f6;
 	color: #666;
-	font-size: 13px;
+	font-size: 0.875rem;
 	margin: 4px;
-	line-height: 24px;
+	line-height: 1.5rem;
 	padding: 0 8px;
 	border-radius: 2px;
 	display: none;
@@ -2927,10 +2924,10 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	background: transparent;
 	border: none;
 	font: inherit;
-	min-height: 19px; /* Required when computing input height at char deletion */
-	height: 19px;
-	max-height: 95px; /* min-height/height x number of lines maximum */
-	line-height: 19px; /* should match height */
+	min-height: 1.4em; /* Required when computing input height at char deletion */
+	height: 1.4em;
+	max-height: 7em; /* min-height/height x number of lines maximum */
+	line-height: 1.4; /* should match height (ChatInput.vue reads the computed value) */
 	outline: none;
 	margin: 5px;
 	padding: 0;
@@ -2947,9 +2944,9 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 #form #upload,
 #form #submit {
 	color: #607992;
-	font-size: 14px;
-	height: 32px;
-	width: 32px;
+	font-size: 1.0625rem;
+	height: 2.25rem;
+	width: 2.25rem;
 	flex: 0 0 auto;
 }
 
@@ -2983,9 +2980,9 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	position: absolute;
 	list-style: none;
 	margin: 0;
-	padding: 0 6px;
-	min-width: 180px;
-	font-size: 14px;
+	padding: 0 0.375rem;
+	min-width: 12rem;
+	font-size: 1rem;
 	background-color: #fff;
 	box-shadow: 0 3px 12px rgb(0 0 0 / 15%);
 	border: 1px solid rgb(0 0 0 / 15%);
@@ -3003,7 +3000,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 .textcomplete-item {
 	cursor: pointer;
 	display: block;
-	padding: 4px 8px;
+	padding: 0.375rem 0.5rem;
 	color: #333;
 	margin-top: 6px;
 	margin-bottom: 6px;
@@ -3022,7 +3019,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 
 .context-menu-item::before,
 .textcomplete-item::before {
-	width: 20px;
+	width: 1.25rem;
 	display: inline-block;
 }
 
@@ -3041,7 +3038,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 }
 
 .textcomplete-item .emoji {
-	width: 32px;
+	width: 2rem;
 	text-align: center;
 }
 
@@ -3595,7 +3592,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 }
 
 .tooltipped::after {
-	font-size: 12px;
+	font-size: 0.8125rem;
 }
 
 @media (min-width: 480px) {
@@ -3625,26 +3622,12 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 		margin-top: 5px;
 	}
 
-	.channel-list-item,
-	#sidebar .empty,
-	.window label,
-	.header .topic,
-	#settings .error,
-	#help .help-item,
-	#loading,
-	#context-menu,
-	#form #input,
-	.textcomplete-menu,
-	.messages .msg {
-		font-size: 15px;
-	}
-
 	#sidebar {
 		display: flex;
 		background: var(--body-bg-color);
 		height: 100%;
 		position: absolute;
-		left: -220px;
+		left: -16rem;
 		z-index: 10;
 		transition: transform 160ms;
 		transform: translateZ(0);
@@ -3668,7 +3651,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	}
 
 	#viewport.menu-open #sidebar {
-		transform: translate3d(220px, 0, 0);
+		transform: translate3d(16rem, 0, 0);
 	}
 
 	#viewport.menu-dragging #sidebar-overlay,
@@ -3696,7 +3679,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 		height: 100%;
 		position: absolute;
 		right: 0;
-		transform: translateX(180px);
+		transform: translateX(12rem);
 		transition: transform 0.2s;
 		z-index: 1;
 	}
@@ -3868,7 +3851,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	position: fixed;
 	top: 0;
 	width: 2em;
-	font-size: 36px;
+	font-size: 2.25rem;
 	color: white;
 	opacity: 0.6;
 	transition: 0.2s opacity;
@@ -4037,13 +4020,13 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	display: inline-flex;
 	align-items: center;
 	gap: 4px;
-	padding: 1px 8px;
+	padding: 0.15em 0.6em;
 	border: 1px solid rgb(128 128 128 / 35%);
-	border-radius: 12px;
+	border-radius: 1em;
 	background: rgb(128 128 128 / 12%);
 	color: var(--body-color);
 	font: inherit;
-	font-size: 0.9em;
+	font-size: 0.9375em;
 	line-height: 1.4;
 	cursor: pointer;
 	user-select: none;
@@ -4121,7 +4104,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 }
 
 #chat .msg-reaction-add {
-	padding: 1px 7px;
+	padding: 0.15em 0.5em;
 	color: var(--body-color-muted);
 	font-size: 1em;
 	line-height: 1.4;
@@ -4163,16 +4146,16 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 }
 
 #chat .msg-action {
-	width: 26px;
-	height: 24px;
+	width: 2.25rem;
+	height: 2rem;
 	padding: 0;
 	border: 0;
 	border-radius: 3px;
 	background: transparent;
 	color: var(--body-color-muted);
 	font: inherit;
-	font-size: 14px;
-	line-height: 24px;
+	font-size: 1rem;
+	line-height: 2rem;
 	cursor: pointer;
 }
 
@@ -4197,7 +4180,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	z-index: 1000;
 	display: flex;
 	flex-direction: column;
-	width: 340px;
+	width: 21.25rem;
 	max-width: calc(100vw - 16px);
 	overflow: hidden;
 	border: 1px solid rgb(128 128 128 / 35%);
@@ -4205,7 +4188,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	background: var(--window-bg-color);
 	box-shadow: 0 8px 28px rgb(0 0 0 / 22%);
 	color: var(--body-color);
-	font-size: 14px;
+	font-size: 1rem;
 	animation: reaction-picker-in 120ms ease-out;
 	transform-origin: top right;
 }
@@ -4264,7 +4247,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	background: transparent;
 	color: var(--body-color);
 	font: inherit;
-	font-size: 13px;
+	font-size: 0.9375rem;
 }
 
 .reaction-picker-input:focus {
@@ -4283,15 +4266,15 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 
 .reaction-picker-clear {
 	flex: 0 0 auto;
-	width: 26px;
-	height: 26px;
+	width: 1.75rem;
+	height: 1.75rem;
 	padding: 0;
 	border: 0;
 	border-radius: 50%;
 	background: transparent;
 	color: var(--body-color-muted);
 	font: inherit;
-	font-size: 12px;
+	font-size: 0.8125rem;
 	cursor: pointer;
 }
 
@@ -4312,13 +4295,13 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 
 .reaction-picker-tab {
 	flex: 1 1 0;
-	height: 28px;
+	height: 2rem;
 	padding: 0;
 	border: 0;
 	border-radius: 6px;
 	background: transparent;
-	font-size: 16px;
-	line-height: 28px;
+	font-size: 1.125rem;
+	line-height: 2rem;
 	opacity: 0.55;
 	cursor: pointer;
 }
@@ -4354,7 +4337,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	padding: 8px 2px 4px;
 	background: var(--window-bg-color);
 	color: var(--body-color-muted);
-	font-size: 11px;
+	font-size: 0.75rem;
 	font-weight: 600;
 	letter-spacing: 0.04em;
 	text-transform: uppercase;
@@ -4371,15 +4354,15 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	min-width: 32px;
-	height: 30px;
+	min-width: 2.25rem;
+	height: 2.125rem;
 	padding: 0 2px;
 	border: 0;
 	border-radius: 6px;
 	background: transparent;
 	color: var(--body-color);
 	font: inherit;
-	font-size: 20px;
+	font-size: 1.375rem;
 	line-height: 1;
 	cursor: pointer;
 }
@@ -4391,7 +4374,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	padding: 0 8px;
 	overflow: hidden;
 	border: 1px solid rgb(128 128 128 / 35%);
-	font-size: 13px;
+	font-size: 0.9375rem;
 	white-space: nowrap;
 	text-overflow: ellipsis;
 }
@@ -4401,13 +4384,13 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	width: 100%;
 	margin: 2px 0;
 	border-style: dashed;
-	font-size: 14px;
+	font-size: 1rem;
 }
 
 .reaction-picker-free-label {
 	margin-right: 6px;
 	color: var(--body-color-muted);
-	font-size: 12px;
+	font-size: 0.8125rem;
 }
 
 .reaction-picker-option:hover {
@@ -4430,7 +4413,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	margin: 0;
 	padding: 16px 4px;
 	color: var(--body-color-muted);
-	font-size: 13px;
+	font-size: 0.9375rem;
 	text-align: center;
 }
 
@@ -4439,7 +4422,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	flex: 0 0 auto;
 	align-items: center;
 	gap: 8px;
-	min-height: 42px;
+	min-height: 2.75rem;
 	padding: 6px 10px;
 	border-top: 1px solid rgb(128 128 128 / 20%);
 	background: rgb(128 128 128 / 10%);
@@ -4447,14 +4430,14 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 
 .reaction-picker-preview-emoji {
 	flex: 0 0 auto;
-	font-size: 24px;
+	font-size: 1.5rem;
 	line-height: 1;
 }
 
 .reaction-picker-preview-emoji.word {
 	max-width: 40%;
 	overflow: hidden;
-	font-size: 15px;
+	font-size: 1rem;
 	white-space: nowrap;
 	text-overflow: ellipsis;
 }
@@ -4468,7 +4451,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 
 .reaction-picker-preview-name {
 	overflow: hidden;
-	font-size: 12px;
+	font-size: 0.8125rem;
 	font-weight: 600;
 	white-space: nowrap;
 	text-overflow: ellipsis;
@@ -4477,7 +4460,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 .reaction-picker-preview-desc {
 	overflow: hidden;
 	color: var(--body-color-muted);
-	font-size: 11px;
+	font-size: 0.75rem;
 	white-space: nowrap;
 	text-overflow: ellipsis;
 }
@@ -4493,7 +4476,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	background: transparent;
 	color: var(--button-color);
 	font: inherit;
-	font-size: 12px;
+	font-size: 0.8125rem;
 	font-weight: bold;
 	cursor: pointer;
 }
@@ -4509,7 +4492,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	flex: 0 1 auto;
 	margin-left: auto;
 	color: var(--body-color-muted);
-	font-size: 12px;
+	font-size: 0.8125rem;
 }
 
 /* "alice is typing…" strip, its own row at the top of #form. Fixed height:
@@ -4517,13 +4500,13 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
    the typist stopped, so the scrollback never bounces (TypingIndicator.vue). */
 #form .typing-indicator {
 	flex: 1 0 100%;
-	height: 20px;
-	min-height: 20px;
+	height: 1.375rem;
+	min-height: 1.375rem;
 	margin: 0 5px;
 	color: var(--body-color-muted);
-	font-size: 12px;
+	font-size: 0.8125rem;
 	font-style: italic;
-	line-height: 20px;
+	line-height: 1.375rem;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -4542,7 +4525,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	background: rgb(0 0 0 / 4%);
 	border-radius: 0 3px 3px 0;
 	color: var(--body-color-muted);
-	font-size: 13px;
+	font-size: 0.875rem;
 	line-height: 1.5;
 }
 
@@ -4568,16 +4551,16 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 
 #form .compose-bar-cancel {
 	flex: 0 0 auto;
-	width: 22px;
-	height: 22px;
+	width: 1.5rem;
+	height: 1.5rem;
 	padding: 0;
 	border: 0;
 	border-radius: 3px;
 	background: transparent;
 	color: var(--body-color-muted);
 	font: inherit;
-	font-size: 13px;
-	line-height: 22px;
+	font-size: 0.875rem;
+	line-height: 1.5rem;
 	cursor: pointer;
 }
 
@@ -4601,7 +4584,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	background: rgb(0 0 0 / 4%);
 	border-radius: 0 3px 3px 0;
 	color: var(--body-color-muted);
-	font-size: 13px;
+	font-size: 0.875rem;
 	line-height: 1.4;
 }
 
@@ -4615,12 +4598,12 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 
 #form .upload-bar-icon::before {
 	content: "\f0c6"; /* https://fontawesome.com/icons/paperclip?style=solid */
-	font: normal normal normal 12px/1 FontAwesome;
+	font: normal normal normal 0.9em/1 FontAwesome;
 	margin-right: 4px;
 }
 
 #form .upload-bar-track {
-	flex: 0 1 180px;
+	flex: 0 1 11.25rem;
 	min-width: 60px;
 	height: 6px;
 	border-radius: 3px;
@@ -4717,7 +4700,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 
 .push-network-state {
 	margin-left: auto;
-	font-size: 12px;
+	font-size: 0.8125rem;
 	font-weight: bold;
 	color: var(--body-color-muted);
 	white-space: nowrap;
@@ -4738,7 +4721,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 
 .push-networks-hint {
 	margin-top: 8px;
-	font-size: 12px;
+	font-size: 0.8125rem;
 	color: var(--body-color-muted);
 }
 
@@ -4749,10 +4732,10 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 
 .session-state {
 	display: inline-block;
-	min-width: 62px;
+	min-width: 4rem;
 	padding: 0 6px;
 	border-radius: 3px;
-	font-size: 12px;
+	font-size: 0.8125rem;
 	font-weight: bold;
 	text-align: center;
 	margin-right: 8px;
@@ -4770,6 +4753,6 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 
 .session-info {
 	color: var(--body-color-muted);
-	font-size: 12px;
+	font-size: 0.8125rem;
 	margin-top: 2px;
 }
