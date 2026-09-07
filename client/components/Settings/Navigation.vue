@@ -39,6 +39,21 @@
 	}
 }
 
+/* The same, in rem, off the settings window itself (a size container,
+ * style.css #settings): beside a centred 30rem container the menu has its
+ * ~12rem only once the window is 56rem wide, and at the big scales that is
+ * wider than most screens, so it stacks above the content instead of
+ * lying across it. */
+@container settings (max-width: 56rem) {
+	.settings-menu {
+		position: static;
+		width: min(30rem, 100%);
+		align-self: center;
+		margin: 0 auto;
+		padding: 0 15px;
+	}
+}
+
 .settings-menu ul {
 	padding: 0;
 }
@@ -57,15 +72,17 @@
 }
 
 .settings-menu li:not(:last-of-type) button {
-	margin-bottom: 8px;
+	margin-bottom: 0.45em;
 }
 
+/* The icon box and its gap are em: at the big scales an 18px box put the
+ * glyph on top of the label. */
 .settings-menu button::before {
-	width: 18px;
-	height: 18px;
+	width: 1em;
+	height: 1em;
 	display: inline-block;
 	content: "";
-	margin-right: 8px;
+	margin-right: 0.45em;
 }
 
 .settings-menu .appearance::before {

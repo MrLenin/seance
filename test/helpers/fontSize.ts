@@ -2,6 +2,7 @@ import {expect} from "chai";
 import {
 	defaultFontSize,
 	fontSizeIndex,
+	fontSizeScale,
 	fontSizes,
 	normalizeFontSize,
 } from "../../client/js/helpers/fontSize";
@@ -10,9 +11,17 @@ import {
 // names through this module, settings.ts normalizes whatever localStorage
 // held, and style.css keys the root font-size off the names.
 describe("fontSize", () => {
-	it("is an ordered scale, large (the browser default) being the default", () => {
+	it("is an ordered scale, large being the default", () => {
 		expect(fontSizes).to.deep.equal(["tiny", "small", "medium", "large", "xlarge", "huge"]);
 		expect(defaultFontSize).to.equal("large");
+	});
+
+	it("grows monotonically through medium = the browser default", () => {
+		expect(fontSizeScale.medium).to.equal(100);
+
+		for (let i = 1; i < fontSizes.length; i++) {
+			expect(fontSizeScale[fontSizes[i]]).to.be.greaterThan(fontSizeScale[fontSizes[i - 1]]);
+		}
 	});
 
 	it("passes values on the scale through", () => {

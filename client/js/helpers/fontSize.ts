@@ -23,6 +23,20 @@ export const fontSizeLabels: Record<FontSize, string> = {
 	huge: "Huge",
 };
 
+/** Each step as a percentage of the browser's default font size. The root
+ * is set from style.css (`html[data-font-size=…]`), which must agree with
+ * this table; Appearance.vue reads it to render its sample at a step that
+ * is not applied yet. "medium" is normal; the ends are meant to be too
+ * small and too large for most eyes. */
+export const fontSizeScale: Record<FontSize, number> = {
+	tiny: 62.5,
+	small: 81.25,
+	medium: 100,
+	large: 125,
+	xlarge: 162.5,
+	huge: 212.5,
+};
+
 /** A stored setting can be anything (stale key, hand-edited localStorage);
  * anything that is not on the scale means the default. */
 export function normalizeFontSize(value: unknown): FontSize {
