@@ -1,7 +1,8 @@
 <template>
 	<ChannelWrapper v-bind="$props" :channel="channel">
-		<!-- Three rows in one tab (see .lobby-wrap in style.css): the name gets
-		     the whole first line, the nick the second, the tools the third. -->
+		<!-- Two rows in one tab (see .lobby-wrap in style.css): the name gets
+		     the whole first line; the tools sit left on the second, the nick
+		     right. -->
 		<div class="lobby-wrap">
 			<div class="lobby-title">
 				<button
@@ -20,48 +21,50 @@
 					unreadCount
 				}}</span>
 			</div>
-			<div v-if="network.nick" :title="nickLabel" class="lobby-nick">
-				<span class="sr-only">Nickname: </span>{{ network.nick }}
-			</div>
-			<div class="lobby-tools">
-				<span
-					:aria-label="statusLabel"
-					class="connection-status-tooltip tooltipped tooltipped-w"
-				>
-					<button
-						:class="['connection-status-icon', statusClass]"
+			<div class="lobby-status">
+				<div class="lobby-tools">
+					<span
 						:aria-label="statusLabel"
-						@click.stop="onStatusClick"
-					/>
-				</span>
-				<span
-					:aria-label="notifyState.label"
-					:title="notifyState.label"
-					class="notify-tooltip"
-				>
-					<span :class="['notify-status-icon', notifyState.cls]" />
-				</span>
-				<span
-					aria-label="Edit this network…"
-					class="edit-network-tooltip tooltipped tooltipped-w tooltipped-no-touch"
-				>
-					<button
-						class="edit-network"
+						class="connection-status-tooltip tooltipped tooltipped-w"
+					>
+						<button
+							:class="['connection-status-icon', statusClass]"
+							:aria-label="statusLabel"
+							@click.stop="onStatusClick"
+						/>
+					</span>
+					<span
+						:aria-label="notifyState.label"
+						:title="notifyState.label"
+						class="notify-tooltip"
+					>
+						<span :class="['notify-status-icon', notifyState.cls]" />
+					</span>
+					<span
 						aria-label="Edit this network…"
-						@click.stop="editNetwork"
-					/>
-				</span>
-				<span
-					:aria-label="joinChannelLabel"
-					class="add-channel-tooltip tooltipped tooltipped-w tooltipped-no-touch"
-				>
-					<button
-						:class="['add-channel', {opened: isJoinChannelShown}]"
-						:aria-controls="'join-channel-' + channel.id"
+						class="edit-network-tooltip tooltipped tooltipped-w tooltipped-no-touch"
+					>
+						<button
+							class="edit-network"
+							aria-label="Edit this network…"
+							@click.stop="editNetwork"
+						/>
+					</span>
+					<span
 						:aria-label="joinChannelLabel"
-						@click.stop="$emit('toggle-join-channel')"
-					/>
-				</span>
+						class="add-channel-tooltip tooltipped tooltipped-w tooltipped-no-touch"
+					>
+						<button
+							:class="['add-channel', {opened: isJoinChannelShown}]"
+							:aria-controls="'join-channel-' + channel.id"
+							:aria-label="joinChannelLabel"
+							@click.stop="$emit('toggle-join-channel')"
+						/>
+					</span>
+				</div>
+				<span v-if="network.nick" :title="nickLabel" class="lobby-nick"
+					><span class="sr-only">Nickname: </span>{{ network.nick }}</span
+				>
 			</div>
 		</div>
 	</ChannelWrapper>

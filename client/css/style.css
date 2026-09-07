@@ -853,12 +853,13 @@ background on hover (unless active) */
 	padding: 6px 14px 4px 0;
 }
 
-/* The network header is three rows inside one tab — one click target, one drag
+/* The network header is two rows inside one tab — one click target, one drag
 handle, one hover — so the name reads at full width instead of sharing its line
 with four tools: `.lobby-title` is the chevron, the name and the unread badge;
-`.lobby-nick` under it is the nick this connection uses, on a line of its own so
-it is never squeezed by the tools; `.lobby-tools` (connection state,
-notifications, edit, join) is the last line, a right-aligned toolbar. The
+`.lobby-status` under it holds the tools (connection state, notifications,
+edit, join) on the left, starting where the channel rows' icons do, and the
+nick this connection uses on the right, ending where the badge does. The tools
+never shrink; a nick too long for what they leave it ends in an ellipsis. The
 wrapper is what the jump-to results' server glyph (::before) sits beside. */
 .channel-list-item .lobby-wrap {
 	display: flex;
@@ -868,33 +869,36 @@ wrapper is what the jump-to results' server glyph (::before) sits beside. */
 	overflow: hidden;
 }
 
-.channel-list-item .lobby-title {
+.channel-list-item .lobby-title,
+.channel-list-item .lobby-status {
 	display: flex;
 	align-items: center;
 	min-width: 0;
 }
 
-.channel-list-item .lobby-nick,
-.channel-list-item .lobby-tools {
-	padding-left: 40px; /* under the name, past the chevron's column */
+.channel-list-item .lobby-status {
+	margin-top: 2px;
+	padding-left: 14px;
+	gap: 8px;
 	font-size: 12px;
 	font-weight: normal;
-}
-
-.channel-list-item .lobby-nick {
-	margin-top: 1px;
-	overflow: hidden;
-	white-space: nowrap;
-	color: rgb(183 197 209 / 75%); /* the sidebar's #b7c5d1, stepped back */
-	mask-image: linear-gradient(to left, transparent, black 20px);
 }
 
 .channel-list-item .lobby-tools {
 	display: flex;
 	align-items: center;
-	justify-content: flex-end;
+	flex-shrink: 0;
 	gap: 4px;
-	margin-top: 2px;
+}
+
+.channel-list-item .lobby-nick {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	text-align: right;
+	color: rgb(183 197 209 / 75%); /* the sidebar's #b7c5d1, stepped back */
 }
 
 /* In the jump-to results a network is a destination, not a thing to operate
@@ -1060,12 +1064,13 @@ the same counter the badge shows). Muted channels keep their faded look. */
 	opacity: 1;
 }
 
-/* Every tool on the status line is the same 22px box, so the block reads as one
-toolbar and each is a fair touch target. */
+/* Every tool on the status line is the same 20px box with its glyph centred, so
+the block reads as one evenly spaced toolbar (a button centres its content by
+itself; the bell is a span and has to be told). */
 .channel-list-item[data-type="lobby"] .add-channel {
 	border-radius: 3px;
-	width: 22px;
-	height: 22px;
+	width: 20px;
+	height: 20px;
 	opacity: 0.4;
 	transition: opacity 0.2s, background-color 0.2s, transform 0.2s;
 }
@@ -1074,7 +1079,7 @@ toolbar and each is a fair touch target. */
 	font-size: 20px;
 	font-weight: normal;
 	display: inline-block;
-	line-height: 20px;
+	line-height: 18px;
 	text-align: center;
 	content: "+";
 	color: #fff;
@@ -1091,8 +1096,8 @@ toolbar and each is a fair touch target. */
 
 .channel-list-item[data-type="lobby"] .edit-network {
 	border-radius: 3px;
-	width: 22px;
-	height: 22px;
+	width: 20px;
+	height: 20px;
 	opacity: 0.4;
 	transition: opacity 0.2s, background-color 0.2s;
 }
@@ -1101,7 +1106,7 @@ toolbar and each is a fair touch target. */
 	content: "\f013"; /* https://fontawesome.com/icons/cog?style=solid */
 	font-size: 13px;
 	display: inline-block;
-	line-height: 22px;
+	line-height: 20px;
 	text-align: center;
 	color: #fff;
 }
@@ -1116,8 +1121,8 @@ toolbar and each is a fair touch target. */
 }
 
 .channel-list-item .connection-status-icon {
-	width: 22px;
-	height: 22px;
+	width: 20px;
+	height: 20px;
 	opacity: 0.7;
 	transition: opacity 0.2s;
 }
@@ -1125,7 +1130,7 @@ toolbar and each is a fair touch target. */
 .channel-list-item .connection-status-icon::before {
 	font-size: 12px;
 	display: inline-block;
-	line-height: 22px;
+	line-height: 20px;
 	text-align: center;
 }
 
@@ -1145,8 +1150,9 @@ toolbar and each is a fair touch target. */
 
 .channel-list-item .notify-status-icon {
 	display: inline-block;
-	width: 22px;
-	height: 22px;
+	width: 20px;
+	height: 20px;
+	text-align: center;
 	opacity: 0.7;
 	transition: opacity 0.2s;
 }
@@ -1157,8 +1163,7 @@ toolbar and each is a fair touch target. */
 
 .channel-list-item .notify-status-icon::before {
 	font-size: 11px;
-	line-height: 22px;
-	text-align: center;
+	line-height: 20px;
 }
 
 .channel-list-item .notify-status-icon.on::before {
