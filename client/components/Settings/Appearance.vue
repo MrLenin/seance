@@ -193,19 +193,22 @@
 		<h2 id="label-font-size">Font size</h2>
 		<div role="group" aria-labelledby="label-font-size" class="font-size-setting">
 			<!-- No `name`: the window's generic @change handler would store the
-			     raw slider index; onFontSizeInput stores the scale name and
-			     previews live while dragging. -->
-			<input
-				type="range"
-				min="0"
-				:max="fontSizes.length - 1"
-				step="1"
-				list="font-size-stops"
-				:value="fontSizeIndex"
-				:aria-valuetext="fontSizeLabel"
-				aria-label="Message font size"
-				@input="onFontSizeInput"
-			/>
+			     raw slider index. While the slider moves only the sample below
+			     follows it; the setting is applied when it is let go. -->
+			<span class="font-size-slider">
+				<input
+					type="range"
+					min="0"
+					:max="fontSizes.length - 1"
+					step="1"
+					list="font-size-stops"
+					:value="shownIndex"
+					:aria-valuetext="shownLabel"
+					aria-label="Message font size"
+					@input="onFontSizeInput"
+					@change="onFontSizeChange"
+				/>
+			</span>
 			<datalist id="font-size-stops">
 				<option
 					v-for="(size, index) in fontSizes"
@@ -214,7 +217,14 @@
 					:label="fontSizeLabels[size]"
 				></option>
 			</datalist>
-			<span class="font-size-value" aria-hidden="true">{{ fontSizeLabel }}</span>
+			<span class="font-size-value" aria-hidden="true">{{ shownLabel }}</span>
+		</div>
+		<div class="font-size-sample" :style="{fontSize: sampleFontSize}" aria-hidden="true">
+			<div v-for="line in sampleLines" :key="line.from" class="line">
+				<span class="time">{{ line.time }}</span>
+				<span class="from user" :class="line.color">{{ line.from }}</span>
+				<span class="text">{{ line.text }}</span>
+			</div>
 		</div>
 
 		<h2>Theme</h2>
@@ -259,26 +269,84 @@ textarea#user-specified-css-input {
 
 .font-size-setting {
 	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
 	gap: 10px;
 }
 
+/*
+ * The one deliberate px island in the chrome: the slider is the control that
+ * changes the scale, so it must not change size with it. Nothing else moves
+ * while it is dragged either — only the sample below renders the new step,
+ * and the page takes the scale when the slider is let go.
+ */
+.font-size-setting .font-size-slider {
+	flex: 0 0 auto;
+	width: 256px;
+	height: 24px;
+}
+
 .font-size-setting input[type="range"] {
-	flex: 1;
-	max-width: 320px;
+	display: block;
+	width: 100%;
+	height: 100%;
 	margin: 0;
+	font-size: 16px;
 }
 
 .font-size-setting .font-size-value {
 	min-width: 90px;
 	color: var(--body-color-muted);
 }
+
+/* A few lines of chat at the step under the slider. Everything in it is em,
+ * so the inline font-size — the step's percentage of the browser default,
+ * whatever the page is at — is the whole preview. */
+.font-size-sample {
+	margin-top: 10px;
+	padding: 0.4em 0.6em;
+	border: 1px solid var(--body-color-muted);
+	border-radius: 0.3em;
+	background: var(--window-bg-color);
+	line-height: 1.4;
+	overflow: hidden;
+}
+
+.font-size-sample .line {
+	display: flex;
+	align-items: flex-start;
+}
+
+.font-size-sample .time {
+	flex: 0 0 auto;
+	margin-right: 0.6em;
+	color: var(--body-color-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.font-size-sample .from {
+	flex: 0 0 auto;
+	margin-right: 0.6em;
+	font-weight: bold;
+}
+
+.font-size-sample .text {
+	flex: 1 1 auto;
+	min-width: 0;
+	word-break: break-word;
+}
 </style>
 
 <script lang="ts">
-import {computed, defineComponent} from "vue";
+import {computed, defineComponent, ref} from "vue";
 import {useStore} from "../../js/store";
-import {fontSizeLabels, fontSizes, normalizeFontSize} from "../../js/helpers/fontSize";
+import {
+	fontSizeLabels,
+	fontSizeScale,
+	fontSizes,
+	normalizeFontSize,
+	type FontSize,
+} from "../../js/helpers/fontSize";
 import {
 	clearTrusted,
 	splitKey,
@@ -328,12 +396,52 @@ export default defineComponent({
 		);
 
 		const fontSize = computed(() => normalizeFontSize(store.state.settings.fontSize));
-		const fontSizeIndex = computed(() => fontSizes.indexOf(fontSize.value));
-		const fontSizeLabel = computed(() => fontSizeLabels[fontSize.value]);
+
+		// The step under the slider while it is being dragged. Applying every
+		// step live re-laid out the whole page (rem chrome) under the pointer
+		// and moved the slider with it, so a drag only renders the sample
+		// below; `change` — the pointer let go, or a keyboard step, which
+		// fires both events — applies it and the page follows in one move.
+		const draggedTo = ref<FontSize | null>(null);
+		const shown = computed(() => draggedTo.value ?? fontSize.value);
+		const shownIndex = computed(() => fontSizes.indexOf(shown.value));
+		const shownLabel = computed(() => fontSizeLabels[shown.value]);
+		// The sample at the shown step: its percentage of the browser default,
+		// through whatever the page is at now (1rem = the applied step).
+		const sampleFontSize = computed(
+			() => `${fontSizeScale[shown.value] / fontSizeScale[fontSize.value]}rem`
+		);
+		const sampleLines = [
+			{
+				time: "12:34",
+				from: "grandma",
+				color: "color-4",
+				text: "Can you read this without your glasses?",
+			},
+			{
+				time: "12:35",
+				from: "you",
+				color: "color-10",
+				text: "Yes! Slide it until this is comfortable.",
+			},
+			{
+				time: "12:35",
+				from: "grandma",
+				color: "color-4",
+				text: "The ends are meant to be too small and too big.",
+			},
+		];
+
+		const stepOf = (event: Event) =>
+			fontSizes[Number((event.target as HTMLInputElement).value)];
 
 		const onFontSizeInput = (event: Event) => {
-			const index = Number((event.target as HTMLInputElement).value);
-			const value = fontSizes[index];
+			draggedTo.value = stepOf(event) ?? null;
+		};
+
+		const onFontSizeChange = (event: Event) => {
+			const value = stepOf(event);
+			draggedTo.value = null;
 
 			if (value) {
 				void store.dispatch("settings/update", {name: "fontSize", value, sync: true});
@@ -348,9 +456,12 @@ export default defineComponent({
 			clearTrusted,
 			fontSizes,
 			fontSizeLabels,
-			fontSizeIndex,
-			fontSizeLabel,
+			shownIndex,
+			shownLabel,
+			sampleFontSize,
+			sampleLines,
 			onFontSizeInput,
+			onFontSizeChange,
 		};
 	},
 });

@@ -88,10 +88,14 @@ Done 2026-09-06 (the users' feedback after the slider landed was that the
 chrome stayed small while the messages grew — which was exactly what the
 slider did, since it reached three selectors):
 
-- [x] The scale is `html { font-size }`: `large` = 100 % of the browser
-      default (16 px) is the new default; tiny 62.5 %, small 75 %, medium
-      87.5 % (the old 14 px), xlarge 112.5 %, huge 131.25 %. A stored
-      `medium` keeps the old look.
+- [x] The scale is `html { font-size }`: `medium` = 100 % of the browser
+      default (16 px); tiny 62.5 %, small 81.25 %, large 125 % (the
+      default), xlarge 162.5 %, huge 212.5 %. Re-scaled 2026-09-07: the
+      first cut topped out at 131.25 % (21 px), which was not large for
+      anyone who needs large, and spent half its stops under 16 px. The
+      ends are meant to be too small and too large for most people. The
+      sidebar is `--sidebar-width` = `min(8rem + 128px, 85vw)`, half rate
+      and never past a phone screen.
 - [x] Every px font size and the chrome's box sizes in `style.css` and the
       component styles are rem/em: header and footer 3 rem, header and form
       buttons 2.5 rem / 2.25 rem, sidebar 16 rem with 1 rem rows and

@@ -313,10 +313,24 @@ async function waitFor(expression, {timeout = defaultTimeout, label} = {}) {
 const count = (selector) => evaluate(`document.querySelectorAll(${jsString(selector)}).length`);
 
 async function pointAt(selector, index) {
-	const r = await rect(selector, index);
+	let r = await rect(selector, index);
 
 	if (!r || (r.width === 0 && r.height === 0)) {
 		throw new Error(`no visible element for ${selector}[${index}]`);
+	}
+
+	// A real pointer can only reach what is on screen: scroll a target that
+	// is off the viewport into it first (a scaled-up UI puts a form's buttons
+	// below the fold), then measure again.
+	const {w, h} = await evaluate(`({w: innerWidth, h: innerHeight})`);
+
+	if (r.y < 0 || r.y + r.height > h || r.x < 0 || r.x + r.width > w) {
+		await evaluate(
+			`document.querySelectorAll(${jsString(
+				selector
+			)})[${index}]?.scrollIntoView({block: "center", inline: "center"})`
+		);
+		r = await rect(selector, index);
 	}
 
 	return {x: r.x + r.width / 2, y: r.y + r.height / 2};
