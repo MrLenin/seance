@@ -300,7 +300,7 @@ the server tab on new connection"
 }
 
 #connect .connect-row.connect-auth input {
-	margin: 3px 10px 0 0;
+	margin: 0.15em 0.5em 0 0;
 }
 
 #connect .connect-note {

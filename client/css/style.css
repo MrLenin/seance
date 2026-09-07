@@ -87,10 +87,15 @@
 	 * (Settings → Appearance; client/js/helpers/fontSize.ts) grows the whole
 	 * interface together. The steps below are percentages of the browser's
 	 * default font size rather than pixels, so a user who raised that in
-	 * their browser gets a bigger client too. "large" is the default and
-	 * equals the browser default (16px unless changed); "medium" is the 14px
-	 * the client used to ship with. */
+	 * their browser gets a bigger client too. "medium" is 100%, the browser
+	 * default (16px unless changed); "large", the default, is a real step up
+	 * from it, and the scale runs from too small to read to too large to be
+	 * sensible on purpose: the ends exist for eyes that need them. */
 	font-size: 100%;
+
+	/* The sidebar scales at half rate — 16rem at medium, but a full 16rem of
+	 * a 34px root would not fit a phone — and never past the screen. */
+	--sidebar-width: min(calc(8rem + 128px), 85vw);
 }
 
 /* The font-size setting's scale (client/js/helpers/fontSize.ts). */
@@ -99,19 +104,19 @@ html[data-font-size="tiny"] {
 }
 
 html[data-font-size="small"] {
-	font-size: 75%;
+	font-size: 81.25%;
 }
 
-html[data-font-size="medium"] {
-	font-size: 87.5%;
+html[data-font-size="large"] {
+	font-size: 125%;
 }
 
 html[data-font-size="xlarge"] {
-	font-size: 112.5%;
+	font-size: 162.5%;
 }
 
 html[data-font-size="huge"] {
-	font-size: 131.25%;
+	font-size: 212.5%;
 }
 
 ::placeholder {
@@ -323,7 +328,7 @@ p {
 .container {
 	padding: 0 15px;
 	margin-bottom: 20px;
-	width: 30rem;
+	width: min(30rem, 100%); /* never wider than the window at the big scales */
 	align-self: center;
 	touch-action: pan-y;
 }
@@ -757,7 +762,7 @@ p {
 #sidebar {
 	display: none;
 	flex-direction: column;
-	width: 16rem;
+	width: var(--sidebar-width);
 	max-height: 100%;
 	will-change: transform;
 	color: #b7c5d1; /* same as .channel-list-item color */
@@ -1311,6 +1316,27 @@ so the toolbar has one weight; green is what marks a subscribed bell. */
 .window label,
 #settings .error {
 	font-size: 1rem;
+}
+
+/* A size container, so the settings menu can ask whether the window is wide
+ * enough for it to sit beside the content (Navigation.vue) in rem, which a
+ * media query cannot see. */
+#settings {
+	/* stylelint-disable-next-line property-no-unknown */
+	container-type: inline-size;
+	/* stylelint-disable-next-line property-no-unknown */
+	container-name: settings;
+}
+
+/* Native checkboxes and radios do not follow the font; size them off it so
+ * the big scales get a target that matches their label. */
+input[type="checkbox"],
+input[type="radio"] {
+	width: 1em;
+	height: 1em;
+	margin: 0 0.4em 0 0;
+	vertical-align: -0.1em;
+	flex: 0 0 auto;
 }
 
 .input {
@@ -2627,7 +2653,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 }
 
 #settings .opt input {
-	margin-right: 6px;
+	margin-right: 0.4em;
 }
 
 /* Media previews: reveal policy and trusted hosts (Settings/Appearance.vue) */
@@ -3713,7 +3739,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 		background: var(--body-bg-color);
 		height: 100%;
 		position: absolute;
-		left: -16rem;
+		right: 100%; /* its own width off screen, whatever that width is */
 		z-index: 10;
 		transition: transform 160ms;
 		transform: translateZ(0);
@@ -3737,7 +3763,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	}
 
 	#viewport.menu-open #sidebar {
-		transform: translate3d(16rem, 0, 0);
+		transform: translate3d(100%, 0, 0);
 	}
 
 	#viewport.menu-dragging #sidebar-overlay,
