@@ -614,6 +614,56 @@ describe("Chat history (history.ts)", function () {
 			expect(pendingHistory(h.client)).to.have.length(0);
 		});
 
+		it("never answers a pending request with another channel's unlabeled batch", function () {
+			// 2026-09-06: after a reload, #operserv's reattach replay page was
+			// rendered in #linux. The outer bouncer-replay batch had gone
+			// unrecognised, so the inner batch had no parent and no label, its
+			// target (#operserv) matched no pending request, and findRequest
+			// fell back to pending[0] -- #linux's own fill. A batch that names
+			// a target must never resolve a request for a different one; it is
+			// delivered to its own channel instead.
+			const h = setup();
+			const seance = joined(h);
+
+			// A second channel, joined and its automatic fill answered.
+			h.transport.lines(
+				"@time=2026-08-25T12:01:00.000Z;msgid=join-2 :alice!alice@host JOIN #other alice :Alice",
+				":irc.test 353 alice = #other :@alice dave",
+				":irc.test 366 alice #other :End of /NAMES list."
+			);
+			batch(h, [], {
+				ref: "hist2",
+				target: "#other",
+				label: labelOf(h.sent().find((l) => l.includes("CHATHISTORY"))),
+			});
+			dispatch.resetHistory();
+			const other = h.client.findChannel("#other")!.id;
+
+			// #seance asks for older history: one request pending.
+			socket.emit("more", {target: seance, lastId: -1, condensed: false});
+			expect(h.sent().some((l) => l.includes("CHATHISTORY"))).to.equal(true);
+			expect(pendingHistory(h.client)).to.have.length(1);
+
+			// An UNLABELED chathistory batch for #other arrives (no parent, no
+			// label): exactly the misrouted replay page.
+			batch(
+				h,
+				[
+					"@time=2026-08-25T11:05:00.000Z;msgid=o5 :dave!dave@host PRIVMSG #other :five",
+					"@time=2026-08-25T11:06:00.000Z;msgid=o6 :dave!dave@host PRIVMSG #other :six",
+				],
+				{ref: "hist9", target: "#other"}
+			);
+
+			// #seance's request is still pending, untouched.
+			expect(pendingHistory(h.client), "#seance request still pending").to.have.length(1);
+			expect(mores(seance), "nothing delivered to #seance").to.have.length(0);
+			// The rows reached #other, as unsolicited older history.
+			const delivered = mores(other);
+			expect(delivered, "one delivery to #other").to.have.length(1);
+			expect(delivered[0].messages.map((m) => m.text)).to.deep.equal(["five", "six"]);
+		});
+
 		it("times out after 15s with an empty reply that keeps the button, then ignores a late batch", function () {
 			const h = setup();
 			const id = joined(h);
