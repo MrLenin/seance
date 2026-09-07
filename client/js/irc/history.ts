@@ -271,7 +271,8 @@ export function abortHistory(client: IrcClient): void {
 function findRequest(
 	client: IrcClient,
 	label: string | undefined,
-	targets: string[]
+	targets: string[],
+	crossTargetFallback = true
 ): HistoryRequest | undefined {
 	const pending = pendingOf(client);
 
@@ -289,6 +290,18 @@ function findRequest(
 		if (byTarget) {
 			return byTarget;
 		}
+	}
+
+	// A history batch names its target; one that matches no request by
+	// label or by that target is NOT ours to answer with another channel's
+	// request. Answering pending[0] delivered one channel's history into
+	// whatever buffer had asked first (2026-09-06: #operserv's replay page
+	// landed in #linux after a reload, when the outer bouncer-replay batch
+	// went unrecognised). A FAIL keeps the fallback: its context may omit
+	// the target, and the oldest request is then the only way it is
+	// answered instead of waiting out the timeout.
+	if (targets.length > 0 && !crossTargetFallback) {
+		return undefined;
 	}
 
 	return pending[0];
@@ -511,7 +524,7 @@ export const chathistoryBatch: BatchHandler = (client, batch) => {
 	}
 
 	const label = batch.tags.get("label") ?? batch.parent?.tags.get("label");
-	const request = findRequest(client, label, target ? [target] : []);
+	const request = findRequest(client, label, target ? [target] : [], false);
 
 	if (request) {
 		resolve(client, request, batch.messages, "batch", batch.tags.has("draft/chathistory-end"));
