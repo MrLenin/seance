@@ -916,7 +916,11 @@ socket.on("init", async () => {
 
 /** A reply typed into a notification, as the worker hands it over: by
  * network uuid + target name (the page's channel ids mean nothing to it). */
+/** A reply typed into a notification: relayed by the service worker
+ * (bus-contract §2.2) or queued in its outbox. */
 interface QueuedReply {
+	/** Absent on entries an earlier build queued: those are replies. */
+	type?: "reply";
 	network: string;
 	target: string;
 	text: string;
@@ -929,13 +933,30 @@ interface QueuedReply {
 	deadline?: number;
 }
 
+/** A notification's Mark read: the account's read marker for `target` at
+ * `time` (the notification's newest message), relayed or queued like a
+ * reply. */
+interface QueuedMarkRead {
+	type: "markread";
+	network: string;
+	target: string;
+	time: string;
+	deadline?: number;
+}
+
+type OutboxEntry = QueuedReply | QueuedMarkRead;
+
 const OUTBOX_KEY = "outbox";
+
+function networkUp(uuid: string): boolean {
+	const network = store.getters.findNetwork(uuid);
+
+	return Boolean(network && network.status.connected);
+}
 
 /** Send a relayed reply now if that network is connected. */
 function sendReplyNow(reply: QueuedReply): boolean {
-	const network = store.getters.findNetwork(reply.network);
-
-	if (!network || !network.status.connected) {
+	if (!networkUp(reply.network)) {
 		return false;
 	}
 
@@ -949,22 +970,41 @@ function sendReplyNow(reply: QueuedReply): boolean {
 	return true;
 }
 
+/** Set a relayed read marker now if that network is connected. Connected
+ * is enough: without `draft/read-marker` the IRC layer sends nothing, and
+ * nothing better could be done for that entry later either. */
+function markReadNow(mark: QueuedMarkRead): boolean {
+	if (!networkUp(mark.network)) {
+		return false;
+	}
+
+	socket.emit("markread", {network: mark.network, target: mark.target, time: mark.time});
+
+	return true;
+}
+
+/** Send one relayed or queued entry now; false while its network is down. */
+function sendEntryNow(entry: OutboxEntry): boolean {
+	return entry.type === "markread" ? markReadNow(entry) : sendReplyNow(entry);
+}
+
 /** Serialises outbox rewrites so a burst of connects cannot lose a reply. */
 let outboxChain: Promise<void> = Promise.resolve();
 
-/** Send what the worker queued for `network` (a reply typed while no page
- * could send it), now that the network is connected. */
+/** Send what the worker queued for `network` (a reply typed, or a Mark
+ * read tapped, while no page could send it), now that the network is
+ * connected. */
 function drainOutbox(network: string): void {
 	outboxChain = outboxChain
 		.then(async () => {
-			const queued = (await idbGet<QueuedReply[]>(OUTBOX_KEY)) ?? [];
+			const queued = (await idbGet<OutboxEntry[]>(OUTBOX_KEY)) ?? [];
 
 			if (!Array.isArray(queued) || queued.length === 0) {
 				return;
 			}
 
 			const rest = queued.filter(
-				(reply) => !(reply.network === network && sendReplyNow(reply))
+				(entry) => !(entry.network === network && sendEntryNow(entry))
 			);
 
 			if (rest.length !== queued.length) {
@@ -1000,23 +1040,23 @@ if (browserSupported() && "serviceWorker" in navigator) {
 			return;
 		}
 
-		// A reply typed into a notification: send it over this page's own
-		// connection and tell the worker whether that worked (it falls back
-		// to its own connection, or queues the reply, otherwise).
-		if (event.data.type === "reply") {
-			const reply = event.data as QueuedReply;
+		// A reply typed into a notification, or its Mark read: send it over
+		// this page's own connection and tell the worker whether that worked
+		// (it falls back to its own connection, or queues the entry, otherwise).
+		if (event.data.type === "reply" || event.data.type === "markread") {
+			const entry = event.data as OutboxEntry;
 			const port = event.ports[0];
 			let ok = false;
 
 			try {
 				// Delivered late (this page was frozen): the worker has already
-				// sent or queued it — sending now would post the reply twice.
-				const stale = typeof reply.deadline === "number" && Date.now() > reply.deadline;
+				// sent or queued it — sending now would post a reply twice.
+				const stale = typeof entry.deadline === "number" && Date.now() > entry.deadline;
 
-				ok = !stale && sendReplyNow(reply);
+				ok = !stale && sendEntryNow(entry);
 			} catch (error) {
 				// eslint-disable-next-line no-console
-				console.warn("[webpush] relayed reply failed", error);
+				console.warn("[webpush] relayed message failed", error);
 			}
 
 			if (port) {

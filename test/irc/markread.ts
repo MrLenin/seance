@@ -403,4 +403,49 @@ describe("Read markers (handlers/markread.ts)", function () {
 		const without = setup({readMarker: false});
 		expect(join(without)).to.not.include("MARKREAD #seance");
 	});
+
+	describe("a marker asked for by the page (the `markread` emit — a notification's Mark read)", function () {
+		it("sends MARKREAD for the target at the given time, at once", function () {
+			const h = setup();
+			const chanId = joined(h);
+			live(h, 1);
+			live(h, 2);
+
+			socket.emit("markread", {
+				network: h.client.uuid,
+				target: "#seance",
+				time: "2026-08-25T12:02:00.000Z",
+			});
+			expect(h.sent()).to.deep.equal(["MARKREAD #seance timestamp=2026-08-25T12:02:00.000Z"]);
+
+			// The channel's marker moved with it: opening it has nothing newer to send.
+			socket.emit("open", chanId);
+			clock.tick(MARKREAD_DEBOUNCE_MS);
+			expect(h.sent()).to.deep.equal(["MODE #seance"]);
+		});
+
+		it("marks a query read even when no window for it is open", function () {
+			const h = setup();
+			joined(h);
+
+			socket.emit("markread", {
+				network: h.client.uuid,
+				target: "bob",
+				time: "2026-08-25T12:02:00.000Z",
+			});
+			expect(h.sent()).to.deep.equal(["MARKREAD bob timestamp=2026-08-25T12:02:00.000Z"]);
+		});
+
+		it("sends nothing without the cap", function () {
+			const h = setup({readMarker: false});
+			joined(h);
+
+			socket.emit("markread", {
+				network: h.client.uuid,
+				target: "#seance",
+				time: "2026-08-25T12:02:00.000Z",
+			});
+			expect(h.sent()).to.deep.equal([]);
+		});
+	});
 });

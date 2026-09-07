@@ -33,9 +33,11 @@ _Live-cycle findings 2026-09-02 (first real trigger attempt, testnet ircd):_
   never sent. Upstream-candidate commit in `testnet/nefarious`.
 - **Notification actions and merging** (all covered by
   `test/tests/service-worker.ts`): Reply (inline text on desktop; a
-  deep-linking button elsewhere) and Mute 30m both run over a throwaway SASL
-  connection the worker opens from the stashed credentials — reply sends
-  `PRIVMSG`, mute does a metadata GET-merge-SET on `draft/webpush/mute`.
+  deep-linking button elsewhere) and Mark read (since 2026-09-07; Mute 30m
+  before that, see § Mark read replaces Mute 30m) both fall back to a
+  throwaway SASL connection the worker opens from the stashed credentials
+  — reply sends `PRIVMSG`, Mark read sends `MARKREAD` under
+  `draft/read-marker`.
   Same-target pushes merge into one notification whose body combines the
   recent messages with middle-ellipsis truncation; the `t:"read"` relay
   closes a target's notification once another device has read past it.
@@ -635,7 +637,8 @@ tests in `test/tests/service-worker.ts`, `test/push/merge.ts`, `test/irc/client.
   The page's rule is unchanged: the batch msgid it saw on the opener is the
   reference on every line, so every line is blocked whichever arrives
   first.
-- **Actions:** `[Mute 30m, Reply]`.
+- **Actions:** `[Mute 30m, Reply]` (Mark read took Mute's slot on
+  2026-09-07, see § Mark read replaces Mute 30m).
 
 Verified on the rig with the probes above: page relay acked in 8 ms and the
 page sent `@+draft/reply=…;label=s1 PRIVMSG`; held session → throwaway
@@ -650,6 +653,71 @@ kept) it posted no notification of its own for them. Whether Enter submits
 the inline reply is the platform's notification UI, not the page's: the
 Notifications API only lets the worker declare a `text` action with a
 title and placeholder.
+
+## Mark read replaces Mute 30m (2026-09-07)
+
+Asked: Mute 30m had no value next to Reply (the OS mutes a site or app
+well enough); what else could that slot do? Chosen: **Mark read** — the
+second action Slack, Discord, Teams and WhatsApp settled on, and the
+natural complement of Reply: "seen, no answer needed".
+
+- **What it does.** Sets the account's read marker for the conversation at
+  the notification's newest message (`data.time`; the click's time when the
+  push carried none). nefarious2 stores it, echoes it to the account's
+  sessions and relays it to every push subscription (`m_markread.c` →
+  `webpush_notify_read`), and the worker already closes the matching
+  notification on that relay — so one tap on the phone clears the
+  notification on the laptop too, and the app opens with `firstUnread` in
+  the right place through the normal inbound `MARKREAD` handler.
+- **Three roads, like a reply** (`handleMarkRead`): an open page first
+  (`{type: "markread", network, target, time, deadline}` over a
+  `MessageChannel`, one page at a time, the visible one first; the page
+  answers through the new `markread` bus emit → `IrcClient.markRead` →
+  `handlers/markread.ts` `markReadAt`, which sends at once and moves the
+  channel's own marker forward so the debounced path never follows with an
+  older one — a query with no window still gets its marker), then the
+  worker's throwaway connection (`swMarkRead`: `draft/read-marker` in its
+  `CAP REQ` — `swIrcOpen` now takes the optional caps to ask for,
+  `message-tags` for a reply — and `MARKREAD` sent at 001, since no channel
+  membership is involved nothing races the bouncer's JOIN replay; the echo
+  at our timestamp or 600 ms of silence is success, a `FAIL MARKREAD`, a
+  421 or a server without the cap is not), then the outbox (an entry with
+  `type: "markread"`; the page's `drainOutbox` sends entries by `type`, and
+  an entry without one is a reply from an earlier build). A marker is
+  nothing to type, so the last road does **not** open the app.
+- **The notification closes locally whatever happened**, and the badge is
+  recounted: the tap is never a no-op.
+- **Removed:** `swMute`, `mergeMuteEntry`, the `mute30` action and the
+  harness's mute-list scripting. Settings' account-wide snooze
+  (`webpush.setSnooze`, page-side metadata) is untouched.
+- **What the OS cannot do instead:** an OS mute is per site or app, never
+  per channel across devices — the one thing Mute 30m did that nothing else
+  does. Judged not worth the slot.
+- **Platforms:** Chrome shows two actions, Firefox none, iOS none for web
+  push — Mark read exists on Chrome desktop and Android only, like Reply.
+- Tests: `test/tests/service-worker.ts` § service worker mark read (the
+  throwaway at the notification's time, a channel at 001, the click time
+  without a `time` tag, page first, a frozen page, the outbox without a
+  login, without the cap, on a FAIL) and `test/irc/markread.ts` § a marker
+  asked for by the page (undebounced send, a query without a window,
+  nothing without the cap).
+- Browser: `tools/scenarios/push-mark-read.mjs` — the page's road against
+  the rig (relay → `{ok: true}` → `MARKREAD` on the wire → the server's
+  echo; a query with no window; a stale deadline refused; an outbox entry
+  drained on the next visit and the outbox emptied). **nefarious2 defaults
+  `CAP_draft_read_marker` to off and the rig's conf does not set it**, so
+  the scenario switches it on for the run through the rig's oper
+  (`tools/scenarios/lib/rig-feature.mjs`, `SET CAP_draft_read_marker TRUE`)
+  and back off after; with the feature off no client gets the cap and the
+  page never sends a marker. A throwaway probe of `swMarkRead` against the
+  rig (2026-09-07) showed `CAP REQ :sasl draft/read-marker` acknowledged,
+  the marker sent at 001 ahead of the bouncer's replay, the volunteered
+  `MARKREAD #seance timestamp=*` ignored and the true echo 100 ms after the
+  dial. The server clamps a marker dated in the future to its own clock.
+- On a deploy whose ircd leaves the feature off, the tap still closes the
+  notification: the throwaway sees no cap, the entry goes to the outbox,
+  and the page consumes it on the next connect without sending (connected
+  is enough — there is nothing better to do with it later).
 
 ## Verification checklist (phase 1 done = all of these)
 

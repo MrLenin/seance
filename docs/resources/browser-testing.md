@@ -124,6 +124,15 @@ gives `cut()` (drop every proxied socket without a word), `refuse()` /
 `accept()` (every new dial dropped at once, or let through) and `close()`.
 `reconnect-after-backoff.mjs` and `disconnected-channel.mjs` are built on it.
 
+To use a cap the testnet ircd leaves off — nefarious2 gates several behind
+feature flags that default to off, `CAP_draft_read_marker` among them, and
+the rig's conf only sets a few — `tools/scenarios/lib/rig-feature.mjs`
+`rigFeature(feature, value)` logs in as the rig's oper and `SET`s it at
+runtime, returning whether the cap was in `CAP LS` before and after so the
+scenario restores only what it changed. A flip sends `CAP NEW` / `CAP DEL`
+to every cap-notify client on the rig, so keep the window short.
+`push-mark-read.mjs` is the model.
+
 ### Rules that keep a scenario honest
 
 1. **Use `click`, never `evaluate("el.click()")`.** It dispatches real pointer

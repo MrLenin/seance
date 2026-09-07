@@ -154,6 +154,46 @@ function sendMarkRead(client: IrcClient, chan: Channel): void {
 	);
 }
 
+/**
+ * The user read `target` up to `time` elsewhere — a notification's Mark
+ * read, relayed by the service worker (bus-contract §2 `markread`): send
+ * the marker at once, undebounced, since nothing newer is coming from
+ * here. `target` need not be loaded (a query with no window still has a
+ * marker); a loaded channel's own marker moves with it so the debounced
+ * path does not follow with an older one, and a pending send is dropped.
+ */
+export function markReadAt(client: IrcClient, target: string, time: Date): void {
+	if (
+		Number.isNaN(time.getTime()) ||
+		!markReadEnabled(client) ||
+		client.transport.state !== "open"
+	) {
+		return;
+	}
+
+	const chan = client.findChannel(target);
+
+	if (chan) {
+		if (!markable(chan)) {
+			return;
+		}
+
+		if (chan.readMarker && time.getTime() <= chan.readMarker.getTime()) {
+			return; // marked at least this far already
+		}
+
+		cancelMarkRead(chan);
+		chan.readMarker = time;
+	}
+
+	client.send(
+		formatLine({
+			command: "MARKREAD",
+			params: [chan ? chan.name : target, `timestamp=${time.toISOString()}`],
+		})
+	);
+}
+
 /** Ask the server for the stored marker (`MARKREAD <target>`), e.g. after JOIN. */
 export function fetchReadMarker(client: IrcClient, chan: Channel): void {
 	if (!markable(chan) || !markReadEnabled(client) || client.transport.state !== "open") {

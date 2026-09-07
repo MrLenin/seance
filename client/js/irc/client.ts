@@ -38,7 +38,7 @@ import {
 	resetMultiline,
 	sendMultiline,
 } from "./multiline";
-import {cancelMarkRead, scheduleMarkRead} from "./handlers/markread";
+import {cancelMarkRead, markReadAt, scheduleMarkRead} from "./handlers/markread";
 import {abortHistory} from "./history";
 import {
 	cancelCatchup,
@@ -1363,6 +1363,16 @@ export class IrcClient {
 			[remove ? UNREACT_TAG : REACT_TAG]: text,
 			[REPLY_TAG]: msgid,
 		});
+	}
+
+	/**
+	 * The user read `target` up to `time` (ISO 8601) somewhere else — a
+	 * notification's Mark read, relayed by the service worker (bus-contract
+	 * §2 `markread`). Sent at once, undebounced; nothing without the
+	 * `draft/read-marker` cap or while not connected.
+	 */
+	markRead(target: string, time: string): void {
+		markReadAt(this, target, new Date(time));
 	}
 
 	/**

@@ -209,6 +209,8 @@ interface ClientToServerEvents {
 	 * nothing; the bus handler drops it when that network is not connected,
 	 * so callers check `network.status.connected` first. */
 	send: EventHandler<{network: string; target: string; text: string; replyTo?: string}>;
+	/** A notification's Mark read relayed by the service worker (and the outbox it drains): the account's read marker for `target` on `network` at `time` (ISO 8601, the notification's newest message). Sent as `MARKREAD` when the network is connected and negotiated `draft/read-marker`; otherwise dropped, so callers check `network.status.connected` first. */
+	markread: EventHandler<{network: string; target: string; time: string}>;
 	"msg:react": EventHandler<{target: number; msgid: string; text: string; remove?: boolean}>;
 	"msg:redact": EventHandler<{target: number; msgid: string; reason?: string}>;
 	/** The user's own input activity; the IRC layer throttles and sends `+typing` TAGMSGs. */

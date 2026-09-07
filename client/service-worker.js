@@ -322,14 +322,17 @@ function showPageNotification(event, payload) {
 //     tag replaces the record in place, and `renotify` only for a new
 //     message,
 //   - app badge = total unread across push notifications,
-//   - actions on every platform: Reply (an inline text field where the
-//     platform has one; a button that opens the conversation elsewhere)
-//     and Mute 30m. A typed reply goes out through an open page when there
+//   - actions on every platform: Mark read and Reply (an inline text field
+//     where the platform has one; a button that opens the conversation
+//     elsewhere). A typed reply goes out through an open page when there
 //     is one, else over a short-lived IRC connection the worker opens
 //     itself (credentials come from the page via IndexedDB, only stashed
 //     when the user enabled push AND password remembering), else it is
 //     queued in IndexedDB and the app opened on the conversation to send
-//     it — never dropped. Mute uses the worker's connection.
+//     it — never dropped. Mark read sets the account's read marker
+//     (draft/read-marker) the same three ways, minus opening the app: the
+//     server relays the marker to every push subscription, which is what
+//     closes the notification on the other devices.
 //   - clicks deep-link by network + target (`#/net/<uuid>/<target>`), which
 //     survives the page and its session-local channel ids,
 //   - `pushsubscriptionchange` re-subscribes with the stashed VAPID key and
@@ -418,7 +421,7 @@ function randomNick() {
  * it); `ctx.onLine(fn)` sees every later line.  Resolves through done(ok):
  * false on any SASL/registration failure, a close, or the timeout.
  */
-function swIrcOpen(net, pre, onReady) {
+function swIrcOpen(net, pre, onReady, optional = []) {
 	return new Promise((resolve) => {
 		const scheme = net.tls ? "wss://" : "ws://";
 		const url = scheme + net.host + ":" + net.port + "/";
@@ -428,10 +431,12 @@ function swIrcOpen(net, pre, onReady) {
 		let nickTries = 0;
 		let settled = false;
 		let offered = []; // CAP LS, possibly over several lines
-		let askedTags = false;
+		let asked = []; // the optional caps requested (those the server offered)
 		const watchers = [];
 		const ctx = {
 			nick,
+			/** The optional caps the server acknowledged. */
+			caps: new Set(),
 			/** `message-tags` negotiated: client tags (`+draft/reply`) may go out. */
 			tags: false,
 			onLine(fn) {
@@ -505,8 +510,9 @@ function swIrcOpen(net, pre, onReady) {
 			// from send() before the send returns.
 			if (stage === 0 && / CAP .* LS /.test(l)) {
 				// `CAP * LS * :…` continues on the next line; the last one has
-				// no `*`.  Ask for message-tags only where it is offered, so a
-				// reply can answer the message it was typed under.
+				// no `*`.  Ask for the optional caps only where they are
+				// offered (message-tags so a reply can answer the message it
+				// was typed under, draft/read-marker for a marker).
 				const list = l.slice(l.indexOf(" :", l.indexOf(" LS ")) + 2).split(" ");
 				offered = offered.concat(list.map((cap) => cap.split("=")[0]));
 
@@ -515,22 +521,23 @@ function swIrcOpen(net, pre, onReady) {
 				}
 
 				stage = 1;
-				askedTags = offered.includes("message-tags");
-				ws.send("CAP REQ :sasl" + (askedTags ? " message-tags" : ""));
+				asked = optional.filter((cap) => offered.includes(cap));
+				ws.send("CAP REQ :" + ["sasl"].concat(asked).join(" "));
 				return;
 			}
 
 			if (stage === 1 && / CAP .* ACK /.test(l)) {
 				stage = 2;
-				ctx.tags = askedTags;
+				ctx.caps = new Set(asked);
+				ctx.tags = ctx.caps.has("message-tags");
 				ws.send("AUTHENTICATE PLAIN");
 				return;
 			}
 
 			if (stage === 1 && / CAP .* NAK /.test(l)) {
-				// The tags were the problem, not SASL: ask for SASL alone.
-				if (askedTags) {
-					askedTags = false;
+				// The optional caps were the problem, not SASL: ask for SASL alone.
+				if (asked.length > 0) {
+					asked = [];
 					ws.send("CAP REQ :sasl");
 					return;
 				}
@@ -678,72 +685,144 @@ function swIrcSend(net, target, text, replyTo) {
 		return Promise.resolve(false);
 	}
 
-	return swIrcOpen(net, [], (ws, done, ctx) => {
-		const channel = isChannelName(target);
-		const prefix =
-			replyTo && ctx.tags ? "@" + REPLY_TAG + "=" + escapeTagValue(replyTo) + " " : "";
-		let fired = false;
-		let retried = false;
-		let settle = null;
-		let grace = null;
+	return swIrcOpen(
+		net,
+		[],
+		(ws, done, ctx) => {
+			const channel = isChannelName(target);
+			const prefix =
+				replyTo && ctx.tags ? "@" + REPLY_TAG + "=" + escapeTagValue(replyTo) + " " : "";
+			let fired = false;
+			let retried = false;
+			let settle = null;
+			let grace = null;
 
-		const finish = (ok) => {
-			clearTimeout(settle);
-			clearTimeout(grace);
-
-			try {
-				ws.send("QUIT :done");
-			} catch (e) {
-				//
-			}
-
-			done(ok);
-		};
-
-		const fire = () => {
-			if (fired) {
-				return;
-			}
-
-			fired = true;
-			clearTimeout(settle);
-
-			for (const chunk of chunks) {
-				ws.send(prefix + "PRIVMSG " + target + " :" + chunk);
-			}
-
-			grace = setTimeout(() => finish(true), REPLY_GRACE_MS);
-		};
-
-		ctx.onLine((l) => {
-			if (!fired && channel) {
-				if (isOwnJoin(l, ctx.nick, target) || / NOTICE \S+ :Session resumed/.test(l)) {
-					fire();
-				}
-
-				return;
-			}
-
-			if (fired && /^\S+ 404 /.test(l)) {
+			const finish = (ok) => {
+				clearTimeout(settle);
 				clearTimeout(grace);
 
-				if (retried) {
+				try {
+					ws.send("QUIT :done");
+				} catch (e) {
+					//
+				}
+
+				done(ok);
+			};
+
+			const fire = () => {
+				if (fired) {
+					return;
+				}
+
+				fired = true;
+				clearTimeout(settle);
+
+				for (const chunk of chunks) {
+					ws.send(prefix + "PRIVMSG " + target + " :" + chunk);
+				}
+
+				grace = setTimeout(() => finish(true), REPLY_GRACE_MS);
+			};
+
+			ctx.onLine((l) => {
+				if (!fired && channel) {
+					if (isOwnJoin(l, ctx.nick, target) || / NOTICE \S+ :Session resumed/.test(l)) {
+						fire();
+					}
+
+					return;
+				}
+
+				if (fired && /^\S+ 404 /.test(l)) {
+					clearTimeout(grace);
+
+					if (retried) {
+						finish(false);
+						return;
+					}
+
+					retried = true;
+					fired = false;
+					settle = setTimeout(fire, REPLY_RETRY_MS);
+				}
+			});
+
+			if (channel) {
+				settle = setTimeout(fire, REPLAY_SETTLE_MS);
+			} else {
+				fire();
+			}
+		},
+		["message-tags"]
+	);
+}
+
+// --- marking read over a throwaway connection ------------------------------
+// MARKREAD wants the cap on the session and an account (m_markread.c): the
+// server stores the marker, echoes it to the account's clients and relays
+// it to every push subscription — that relay is what closes the
+// notification on the other devices. No channel membership is involved, so
+// a channel marker goes out at 001: unlike a reply, nothing here races the
+// bouncer's JOIN replay.
+
+/** Mirrors MARKREAD_CAP in client/js/irc/handlers/markread.ts. */
+const READMARKER_CAP = "draft/read-marker";
+const MARKREAD_GRACE_MS = 600; // after sending: time for the server to refuse before QUIT
+
+/** Set the account's read marker for `target` at `time` (ISO 8601) over a
+ * throwaway connection. Resolves true once the server echoed the marker
+ * back or stayed silent past the grace period, false when it refused or
+ * offers no draft/read-marker at all. */
+function swMarkRead(net, target, time) {
+	return swIrcOpen(
+		net,
+		[],
+		(ws, done, ctx) => {
+			let grace = null;
+
+			const finish = (ok) => {
+				clearTimeout(grace);
+
+				try {
+					ws.send("QUIT :done");
+				} catch (e) {
+					//
+				}
+
+				done(ok);
+			};
+
+			if (!ctx.caps.has(READMARKER_CAP)) {
+				finish(false);
+				return;
+			}
+
+			ctx.onLine((l) => {
+				if (/^FAIL MARKREAD /.test(l) || /^\S+ 421 \S+ MARKREAD /.test(l)) {
 					finish(false);
 					return;
 				}
 
-				retried = true;
-				fired = false;
-				settle = setTimeout(fire, REPLY_RETRY_MS);
-			}
-		});
+				// Our own echo: `:server MARKREAD <target> timestamp=<time>`. The
+				// bouncer also volunteers stored markers after its JOIN replay,
+				// so only the one at our time counts.
+				const parts = l.split(" ");
 
-		if (channel) {
-			settle = setTimeout(fire, REPLAY_SETTLE_MS);
-		} else {
-			fire();
-		}
-	});
+				if (
+					parts[1] === "MARKREAD" &&
+					(parts[2] || "").toLowerCase() === target.toLowerCase() &&
+					parts[3] === "timestamp=" + time
+				) {
+					finish(true);
+				}
+			});
+
+			ws.send("MARKREAD " + target + " timestamp=" + time);
+			grace = setTimeout(() => finish(true), MARKREAD_GRACE_MS);
+		},
+		[READMARKER_CAP]
+	);
 }
 
 /** The stash the page writes when push is enabled: our VAPID key and the
@@ -1003,8 +1082,10 @@ async function handlePushNow(raw) {
 			// when no reply text arrives.  showSafely guards the whole call if
 			// a browser rejects the actions outright.  Reply goes last, on the
 			// right: that is where a thumb lands on a phone held in one hand.
+			// Mark read is "seen, no answer needed": the account's read marker
+			// at this notification's newest message, on every device.
 			const actions = [
-				{action: "mute30", title: "Mute 30m"},
+				{action: "markread", title: "Mark read"},
 				{action: "reply", type: "text", title: "Reply", placeholder: "Reply…"},
 			];
 
@@ -1247,7 +1328,7 @@ function canLogin(net) {
 	return Boolean(net && net.saslAccount && net.saslPassword);
 }
 
-// --- replying from the notification ----------------------------------------
+// --- replying and marking read from the notification -----------------------
 // A typed reply must never be lost. Three ways to send it, tried in order:
 //   1. a live page (any window of the app, even a background one) sends it
 //      over its own connection and acks through a MessageChannel — the
@@ -1255,16 +1336,20 @@ function canLogin(net) {
 //   2. the worker's own throwaway connection, when the password is stashed;
 //   3. the outbox: the reply is queued in IndexedDB and the app is opened on
 //      the conversation; the page sends the queue once that network is up.
+// A read marker takes the same three roads; only the last one differs — a
+// marker is nothing to type, so the outbox alone does, and the app stays
+// closed.
 
 const PAGE_REPLY_TIMEOUT_MS = 2500; // a frozen page never answers
 const OUTBOX_KEY = "outbox";
 const OUTBOX_CAP = 20;
 
-/** Ask one page to send the reply: true on its ack, false when it says it
- * cannot or stays silent past the deadline (a frozen page). The deadline
- * travels with the message: a page that only wakes up after it must not
- * send, because by then the reply went out another way. */
-function askPage(client, reply) {
+/** Ask one page to send `message` (a `reply` or a `markread`, see
+ * bus-contract §2.2): true on its ack, false when it says it cannot or
+ * stays silent past the deadline (a frozen page). The deadline travels
+ * with the message: a page that only wakes up after it must not send,
+ * because by then the message went out another way. */
+function askPage(client, message) {
 	return new Promise((resolve) => {
 		const deadline = Date.now() + PAGE_REPLY_TIMEOUT_MS;
 		const channel = new MessageChannel();
@@ -1285,17 +1370,17 @@ function askPage(client, reply) {
 		channel.port1.onmessage = (ev) => finish(Boolean(ev.data && ev.data.ok));
 
 		try {
-			client.postMessage({type: "reply", ...reply, deadline}, [channel.port2]);
+			client.postMessage({...message, deadline}, [channel.port2]);
 		} catch (e) {
 			finish(false);
 		}
 	});
 }
 
-/** Ask the open pages to send the reply, one at a time — the visible one
- * first — until one does. Asking them all at once would post the reply
+/** Ask the open pages to send `message`, one at a time — the visible one
+ * first — until one does. Asking them all at once would post a reply
  * once per window. Resolves true when a page sent it. */
-async function replyViaPage(reply) {
+async function viaPage(message) {
 	const cs = await self.clients.matchAll({includeUncontrolled: true, type: "window"});
 
 	if (cs.length === 0 || typeof MessageChannel !== "function") {
@@ -1306,7 +1391,7 @@ async function replyViaPage(reply) {
 	const order = [first, ...cs.filter((c) => c !== first)];
 
 	for (const c of order) {
-		if (await askPage(c, reply)) {
+		if (await askPage(c, message)) {
 			return true;
 		}
 	}
@@ -1314,12 +1399,13 @@ async function replyViaPage(reply) {
 	return false;
 }
 
-/** Queue a reply for the page to send when its network is next connected. */
-async function enqueueOutbox(reply) {
+/** Queue a reply or a marker for the page to send when its network is
+ * next connected. */
+async function enqueueOutbox(entry) {
 	const prev = await idbGet(OUTBOX_KEY);
 	const outbox = Array.isArray(prev) ? prev : [];
 
-	outbox.push(reply);
+	outbox.push(entry);
 	await idbSet(OUTBOX_KEY, outbox.slice(-OUTBOX_CAP));
 }
 
@@ -1342,6 +1428,7 @@ async function handleReply(data, text) {
 	const net = stashNetwork(stash, data.network);
 	const replyTo = replyTargetOf(data);
 	const reply = {
+		type: "reply",
 		network: net ? net.uuid : data.network,
 		target: data.target,
 		text,
@@ -1349,13 +1436,13 @@ async function handleReply(data, text) {
 		time: new Date().toISOString(),
 	};
 
-	if (await replyViaPage(reply)) {
-		await replyDone(data);
+	if (await viaPage(reply)) {
+		await doneWith(data);
 		return;
 	}
 
 	if (canLogin(net) && (await swIrcSend(net, data.target, text, replyTo))) {
-		await replyDone(data);
+		await doneWith(data);
 		return;
 	}
 
@@ -1363,7 +1450,37 @@ async function handleReply(data, text) {
 	await openApp(data);
 }
 
-async function replyDone(data) {
+/** Mark read: the user has seen the conversation, so set the account's
+ * read marker at the notification's newest message (its `time`; the
+ * click's when the push carried none). A page first, the worker's own
+ * connection second, the outbox last — and the notification closes here
+ * whatever happened, since there is nothing to type and nothing to lose.
+ * The server's relay of the marker closes it on the other devices. */
+async function handleMarkRead(data) {
+	if (data.target) {
+		const stash = await getStash();
+		const net = stashNetwork(stash, data.network);
+		const mark = {
+			type: "markread",
+			network: net ? net.uuid : data.network,
+			target: data.target,
+			time: typeof data.time === "string" ? data.time : new Date().toISOString(),
+		};
+
+		const sent =
+			(await viaPage(mark)) ||
+			(canLogin(net) && (await swMarkRead(net, mark.target, mark.time)));
+
+		if (!sent) {
+			await enqueueOutbox(mark);
+		}
+	}
+
+	await doneWith(data);
+}
+
+/** The notification's conversation has been dealt with here. */
+async function doneWith(data) {
 	await closeForTarget(data.target, new Date().toISOString());
 	await updateBadge();
 }
@@ -1379,24 +1496,11 @@ self.addEventListener("notificationclick", function (event) {
 		return;
 	}
 
-	// Mute 30m: suppress pushes for this target via the account mute list
-	// (the ircd gates pushes on it). GET-merge-SET so other entries survive.
-	if (event.action === "mute30" && data.target) {
+	// Mark read: the account's read marker at the notification's newest
+	// message, which the server relays to every device.
+	if (event.action === "markread") {
 		event.notification.close();
-		event.waitUntil(
-			(async () => {
-				const stash = await getStash();
-				const until = Math.floor(Date.now() / 1000) + 30 * 60;
-				const sent = await swMute(stashNetwork(stash, data.network), data.target, until);
-
-				if (sent) {
-					await closeForTarget(data.target, new Date().toISOString());
-					await updateBadge();
-				} else {
-					await openApp(data);
-				}
-			})()
-		);
+		event.waitUntil(handleMarkRead(data));
 		return;
 	}
 
@@ -1459,81 +1563,6 @@ async function openApp(data, tag) {
 			// already told where to go; focus is best effort
 		}
 	}
-}
-
-/** Mute `target` until `until` (epoch seconds): open a throwaway
- * connection, GET the account mute list, merge, SET.  Resolves true when
- * the SET went out. */
-function swMute(net, target, until) {
-	return swIrcOpen(net, [], (ws, done) => {
-		let value = null;
-
-		const timer = setTimeout(() => done(false), 10000);
-
-		const finish = () => {
-			clearTimeout(timer);
-			ws.send(
-				"METADATA * SET draft/webpush/mute * :" + mergeMuteEntry(value ?? "", target, until)
-			);
-			ws.send("QUIT :done");
-			setTimeout(() => done(true), 200);
-		};
-
-		ws.onmessage = (e) => {
-			const l = e.data;
-
-			if (l.startsWith("PING")) {
-				ws.send("PONG " + l.slice(5));
-				return;
-			}
-
-			if (/^:[^ ]+ 761 /.test(l)) {
-				// RPL_METADATA: <me> <key> <visibility> :<value>
-				const parts = l.split(" ");
-
-				if (parts[3] === "draft/webpush/mute") {
-					value = l.slice(l.indexOf(" :") + 2);
-					finish();
-				}
-
-				return;
-			}
-
-			if (/^:[^ ]+ METADATA /.test(l)) {
-				// Batched metadata echo: METADATA <key> ... :<value>
-				const bits = l.split(" METADATA ")[1] || "";
-
-				if (bits.startsWith("draft/webpush/mute ")) {
-					const colon = bits.indexOf(" :");
-
-					if (colon !== -1) {
-						value = bits.slice(colon + 2);
-						finish();
-					}
-				}
-
-				return;
-			}
-
-			if (/ 762 /.test(l)) {
-				// ERR_NOMATCHINGKEY: no mute list yet; start from empty.
-				value = "";
-				finish();
-			}
-		};
-
-		ws.send("METADATA * GET draft/webpush/mute");
-	});
-}
-
-/** Merge `target:until` into a semicolon-separated mute value (dropping any
- * previous entry for the target). */
-function mergeMuteEntry(value, target, until) {
-	const entries = (value || "").split(";").filter((e) => e && !e.startsWith(target + ":"));
-
-	entries.push(target + ":" + until);
-
-	return entries.join(";");
 }
 
 function findSuitableClient(clientList) {

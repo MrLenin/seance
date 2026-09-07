@@ -73,6 +73,16 @@ export function registerBusHandlers(bus: EventBus, registry: ClientRegistry): vo
 		}
 	});
 
+	// The same road for a notification's Mark read: the account's marker
+	// for a target the worker names, at the notification's newest message.
+	bus.handle("markread", ({network, target, time}) => {
+		const client = registry.clientForNetwork(network);
+
+		if (client && client.isConnected) {
+			client.markRead(target, time);
+		}
+	});
+
 	bus.handle("msg:react", ({target, msgid, text, remove}) => {
 		const client = registry.clientForChannel(target);
 		const chan = client?.channelById(target);
