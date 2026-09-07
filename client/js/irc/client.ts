@@ -187,6 +187,14 @@ export interface IrcClientOptions extends ConnectOptions {
 	 * The manager persists the new port/tls so the saved network stays secure.
 	 */
 	onStsUpgrade?: (change: StsUpgrade) => void;
+	/**
+	 * A SASL login the deploy insists on was refused, so this connect was
+	 * dropped. The manager stands the saved network's `autoconnect` down:
+	 * credentials the server has already refused would fail again at every
+	 * page load, and an autoconnecting entry that never registers leaves no
+	 * way back to the connect screen to fix them.
+	 */
+	onSaslRejected?: () => void;
 }
 
 export const NOT_CONNECTED_TEXT =
@@ -783,6 +791,7 @@ export class IrcClient {
 			true
 		);
 		this.pushMessage(this.lobby, {text: SASL_REQUIRED_HINT}, true);
+		this.options.onSaslRejected?.();
 		this.disconnect("SASL authentication failed");
 		return true;
 	}
