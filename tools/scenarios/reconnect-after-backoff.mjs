@@ -127,11 +127,13 @@ async function check(page, proxy) {
 	);
 	await page.screenshot("3-poked");
 
-	// 5. The radio is back: the next retry gets through.
+	// 5. The radio is back: the next retry gets through. (A dial refused just
+	// before the switch reports its error late: errors stay expected until
+	// the registration is in.)
 	proxy.accept();
-	page.expectWsErrors = false;
 	const frames = page.wsFrames.length;
 	await until(page, () => registered(page, frames), 10000, "the re-registration");
+	page.expectWsErrors = false;
 	page.check("5. registered again on the next retry", registered(page, frames));
 	await page.screenshot("4-back");
 
