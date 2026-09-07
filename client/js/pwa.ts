@@ -13,14 +13,23 @@
 //    a second launch — a `web+irc://` link, an `?uri=` URL, a shortcut — is
 //    delivered to the running window via `window.launchQueue` instead of
 //    reloading it and dropping the IRC connection;
-//  - service-worker update detection: an installed app has no reload button,
-//    so a new build is flagged in the store and Help offers a reload.
+//  - update detection: an installed app has no reload button, so when a
+//    newer build's worker takes over a window that still runs the old
+//    bundle, the store is flagged and Help offers a reload. Long-lived
+//    windows ask for the check themselves (checkForUpdate), since browsers
+//    only look for a new worker script when a page loads.
 //
 // Web push lives in webpush.ts (subscription, the connect-time prompt) and
 // the service worker (delivery).
 
 import {store} from "./store";
 import {BeforeInstallPromptEvent} from "./types";
+import {isOtherBuild} from "./build";
+
+/** A window that stays open re-checks the worker script this often. */
+const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+/** Foreground events come in bursts (focus, visibility, online): one check per gap. */
+const UPDATE_CHECK_MIN_GAP_MS = 5 * 60 * 1000;
 
 interface LaunchParams {
 	targetURL?: string;
@@ -41,6 +50,8 @@ declare global {
 }
 
 let installPromptEvent: BeforeInstallPromptEvent | null = null;
+let registration: ServiceWorkerRegistration | null = null;
+let lastUpdateCheck = 0;
 
 /** True when running as an installed app (standalone window / home screen). */
 export function isStandalone(): boolean {
@@ -69,26 +80,39 @@ function registerServiceWorker(): void {
 		return;
 	}
 
-	// A controller that changes while the page is already controlled means a
-	// newer worker (i.e. a newer build; the worker's cache name is the release
-	// hash) took over. The page keeps running the old bundle until reloaded.
-	let controlled = navigator.serviceWorker.controller !== null;
-
-	navigator.serviceWorker.addEventListener("controllerchange", () => {
-		if (controlled) {
+	// A worker announces its build when it takes over (`activate` in
+	// service-worker.js) and the page compares that with the build it is
+	// itself (build.ts). A different one means a newer build's worker was
+	// installed under a page that keeps running the old bundle until it
+	// reloads — the one time "Reload to update" is true. `controllerchange`
+	// on its own cannot tell: the worker serves network-first, so a page
+	// that has just loaded already runs the new bundle by the time the new
+	// worker claims it.
+	navigator.serviceWorker.addEventListener("message", (event: MessageEvent) => {
+		if (event.data?.type === "build" && isOtherBuild(event.data.build)) {
 			store.commit("updateAvailable");
 		}
-
-		controlled = true;
 	});
+
+	// A message posted before the page listens is held until it says so
+	// (the announce can land while the bundle is still loading).
+	if (typeof navigator.serviceWorker.startMessages === "function") {
+		navigator.serviceWorker.startMessages();
+	}
 
 	navigator.serviceWorker
 		.register("service-worker.js", {scope: "./"})
-		.then(() => navigator.serviceWorker.ready)
-		.then((registration) => {
+		.then((reg) => {
+			registration = reg;
+			// Registering is itself an update check.
+			lastUpdateCheck = Date.now();
+			window.setInterval(() => checkForUpdate(true), UPDATE_CHECK_INTERVAL_MS);
+			return navigator.serviceWorker.ready;
+		})
+		.then((ready) => {
 			// Only advertise the worker once it is active, so that the
 			// notification path never posts to a worker that cannot answer.
-			if (registration.active) {
+			if (ready.active) {
 				store.commit("hasServiceWorker");
 			}
 		})
@@ -99,6 +123,30 @@ function registerServiceWorker(): void {
 			// eslint-disable-next-line no-console
 			console.error("Service worker registration failed:", err);
 		});
+}
+
+/**
+ * Ask the browser to re-fetch the worker script — how a deploy gets noticed
+ * by a window that stays open, since browsers only look on their own when a
+ * page loads. A changed script installs, activates and announces its build
+ * (registerServiceWorker). Called from the foreground hooks, throttled;
+ * `force` is the hourly timer.
+ */
+export function checkForUpdate(force = false): void {
+	if (!registration) {
+		return;
+	}
+
+	const now = Date.now();
+
+	if (!force && now - lastUpdateCheck < UPDATE_CHECK_MIN_GAP_MS) {
+		return;
+	}
+
+	lastUpdateCheck = now;
+	registration.update().catch(() => {
+		// Offline, or the host is down: the next check tries again.
+	});
 }
 
 function watchInstallPrompt(): void {

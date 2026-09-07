@@ -9,9 +9,7 @@
 			<h2 class="help-version-title">
 				<span>{{ store.getters.brandingString("help.about") }} {{ appName }}</span>
 				<small>
-					v{{ store.state.serverConfiguration?.version }} (<router-link
-						id="view-changelog"
-						to="/changelog"
+					v{{ build.version }} (<router-link id="view-changelog" to="/changelog"
 						>release notes</router-link
 					>)
 				</small>
@@ -28,40 +26,30 @@
 					</button>
 				</p>
 
-				<template v-if="store.state.serverConfiguration?.gitCommit">
+				<template v-if="pastRelease">
 					<p>
-						{{ appName }} is running from source (<a
-							:href="`https://github.com/evilnet/seance/tree/${store.state.serverConfiguration?.gitCommit}`"
-							target="_blank"
-							rel="noopener"
-							>commit <code>{{ store.state.serverConfiguration?.gitCommit }}</code></a
-						>).
+						{{ appName }} is built from
+						<a :href="source.commit" target="_blank" rel="noopener"
+							>commit <code>{{ build.gitCommit }}</code></a
+						>, after v{{ build.release }}.
 					</p>
 
 					<ul>
 						<li>
 							Compare
-							<a
-								:href="`https://github.com/evilnet/seance/compare/${store.state.serverConfiguration?.gitCommit}...develop`"
-								target="_blank"
-								rel="noopener"
-								>between
-								<code>{{ store.state.serverConfiguration?.gitCommit }}</code> and
-								<code>develop</code></a
+							<a :href="source.sinceRelease" target="_blank" rel="noopener"
+								>between <code>v{{ build.release }}</code> and
+								<code>{{ build.gitCommit }}</code></a
 							>
-							to see what you are missing
+							to see what changed since the release
 						</li>
 						<li>
 							Compare
-							<a
-								:href="`https://github.com/evilnet/seance/compare/${store.state.serverConfiguration?.version}...${store.state.serverConfiguration?.gitCommit}`"
-								target="_blank"
-								rel="noopener"
-								>between
-								<code>{{ store.state.serverConfiguration?.version }}</code> and
-								<code>{{ store.state.serverConfiguration?.gitCommit }}</code></a
+							<a :href="source.behindDevelop" target="_blank" rel="noopener"
+								>between <code>{{ build.gitCommit }}</code> and
+								<code>develop</code></a
 							>
-							to see your local changes
+							to see what you are missing
 						</li>
 					</ul>
 				</template>
@@ -87,7 +75,7 @@
 				</p>
 				<p>
 					<a
-						href="https://github.com/evilnet/seance/issues/new"
+						:href="source.newIssue"
 						target="_blank"
 						rel="noopener"
 						class="report-issue-link"
@@ -883,6 +871,7 @@
 <script lang="ts">
 import {computed, defineComponent, ref} from "vue";
 import {useStore} from "../../js/store";
+import {buildIdentityOf, isPastRelease, sourceLinks} from "../../js/helpers/sourceLinks";
 import SidebarToggle from "../SidebarToggle.vue";
 
 export default defineComponent({
@@ -897,16 +886,25 @@ export default defineComponent({
 		const appName = computed(() => store.state.branding.appName);
 		const links = computed(() => store.state.branding.links ?? {});
 
-		// Installed PWAs have no reload button; the service worker flags a
-		// newer build in the store (see pwa.ts) and this picks it up.
+		// What this build is (configuration.ts, filled in by webpack) and
+		// where it comes from (branding.links.source).
+		const build = computed(() => buildIdentityOf(store.state.serverConfiguration));
+		const pastRelease = computed(() => isPastRelease(build.value));
+		const source = computed(() => sourceLinks(links.value.source, build.value));
+
+		// Installed PWAs have no reload button; a newer build's worker flags
+		// itself in the store (see pwa.ts) and this picks it up.
 		const reloadForUpdate = () => window.location.reload();
 
 		return {
 			appName,
+			build,
 			isApple,
 			isTouch,
 			links,
+			pastRelease,
 			reloadForUpdate,
+			source,
 			store,
 		};
 	},

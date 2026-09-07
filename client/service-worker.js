@@ -114,8 +114,20 @@ self.addEventListener("activate", function (event) {
 			)
 	);
 
-	event.waitUntil(self.clients.claim());
+	event.waitUntil(self.clients.claim().then(announceBuild));
 });
+
+// Tell every open window which build serves it now. A page whose bundle is
+// older compares (client/js/pwa.ts) and offers "Reload to update"; a page
+// that has just loaded is this build already and stays quiet. Uncontrolled
+// windows included: a hard reload leaves a page without a controller.
+async function announceBuild() {
+	const windows = await self.clients.matchAll({type: "window", includeUncontrolled: true});
+
+	for (const client of windows) {
+		client.postMessage({type: "build", build: cacheName});
+	}
+}
 
 self.addEventListener("fetch", function (event) {
 	if (pushOnly || event.request.method !== "GET") {
