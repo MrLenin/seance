@@ -1,6 +1,7 @@
 import type {TypedStore} from "./store";
 import {mirrorPushPrefs} from "./push-prefs";
 import {normalizeFontSize} from "./helpers/fontSize";
+import {prefersTwelveHourClock} from "./helpers/hourCycle";
 
 const defaultSettingConfig = {
 	apply() {},
@@ -64,8 +65,11 @@ const defaultConfig = {
 	showSeconds: {
 		default: false,
 	},
+	// Whichever clock the browser's locale writes times in, until the reader
+	// says otherwise: en-US opens on "3:04 PM", de-DE on "15:04". Asked once,
+	// at load; a stored setting is assigned over it (store-settings.ts).
 	use12hClock: {
-		default: false,
+		default: prefersTwelveHourClock(),
 	},
 	statusMessages: {
 		default: "condensed",
