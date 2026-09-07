@@ -61,7 +61,7 @@ function readBranding(): BuildBranding {
 		appName,
 		shortName: str(raw.shortName, appName),
 		description: str(raw.description, "IRC client"),
-		themeColor: str(raw.themeColor, "#415364"),
+		themeColor: str(raw.themeColor, "#1a1816"),
 	};
 }
 

@@ -1,0 +1,563 @@
+/* Coffee — the default theme: the "Ink & Amber" colour direction, dark.
+ *
+ * Colour only. The window frame (padding, radius, shadow) is day.css's, the
+ * layout is style.css's. The custom properties are the design handoff's own
+ * token names (docs/resources/themes/ink-amber-theme.md) so a value can be
+ * checked against the tables there; TheLounge's variables (--body-color, …)
+ * are mapped onto them at the end of :root. creama.css, the light variant of
+ * the same direction, imports this file and re-declares the tokens: every
+ * rule below reads a token, never a literal, so it needs nothing else.
+ *
+ * Two values differ from the handoff on purpose: --rail-fg-muted is #8b8177
+ * (the light variant's, 4.6:1 on the rail) rather than #7e7569 (3.9:1)
+ * because the footer icons are the only thing drawn in it, and the nick
+ * palette is 32 slots (style.css hashes nicks into 32) generated from the
+ * handoff's three at the same lightness, ≥ 4.6:1 on --chat-bg. */
+@import "day.css";
+
+:root {
+	color-scheme: dark;
+
+	/* Chat surface: one paper tone, one ink tone, hairline rules. */
+	--chat-bg: #1c1a18;
+	--chat-fg: #ece6dc;
+	--chat-fg-muted: #988f84;
+	--chat-fg-faint: #7e7569;
+	--chat-heading: #c6bcaf;
+	--chat-rule: #2b2724;
+	--chat-accent: #e0a340;
+	--chat-accent-fg: #1c1a18;
+	--chat-accent-rule: #7d5a22;
+	--chat-highlight-bg: #29241c; /* accent 8% into bg (oklab) */
+	--chat-selection: #413524; /* accent 22% into bg */
+	--composer-bg: #232120;
+	--composer-border: #322d29;
+	--window-border: #2a2724;
+	--window-shadow: 0 0 25px rgb(0 0 0 / 60%);
+	--menu-bg: #232120;
+
+	/* Sidebar rail: dark in both variants, only its depth changes. */
+	--rail-bg-top: #1b1815;
+	--rail-bg-bottom: #100e0d;
+	--rail-fg: #c6bcaf;
+	--rail-fg-strong: #f0e7da;
+	--rail-fg-active: #fbf6ee;
+	--rail-fg-muted: #8b8177;
+	--rail-item-active-bg: #282320;
+	--rail-item-hover-bg: rgb(40 35 32 / 60%);
+	--rail-accent: #e0a340;
+	--rail-accent-fg: #17150f;
+	--rail-badge-bg: #2e2925;
+	--rail-badge-fg: #e9dfd0;
+	--rail-input-bg: #0c0b0a;
+	--rail-input-border: #2b2724;
+
+	/* Message semantics. Notices and /me lines take two of the handoff's nick
+	 * colours (olive, light amber) so they stay in the family. */
+	--event-join: #9fbf6a;
+	--event-quit: #e08a72;
+	--nick-default: #e6a45c;
+	--notice-color: #cfcb84;
+	--action-color: #e6a45c;
+
+	/* Notice boxes on the connect form, settings and the version checker. */
+	--note-bg: #262321;
+	--note-fg: #c6bcaf;
+	--warn-bg: #2e2716;
+	--warn-fg: #e0c27a;
+	--error-bg: #33201c;
+	--error-fg: #eaa08e;
+	--ok-bg: #232a1a;
+	--ok-fg: #b6d48e;
+
+	/* Translucent tints over the chat surface (light on dark, dark on light),
+	 * the accent at low alpha, the focus ring, and the scrollbars. */
+	--tint-soft: rgb(255 255 255 / 4%);
+	--tint-strong: rgb(255 255 255 / 8%);
+	--accent-tint-20: rgb(224 163 64 / 20%);
+	--accent-tint-30: rgb(224 163 64 / 30%);
+	--focus-ring: rgb(224 163 64 / 55%);
+	--scrollbar-track: rgb(236 230 220 / 6%);
+	--scrollbar-thumb: rgb(236 230 220 / 25%);
+	--scrollbar-thumb-active: rgb(236 230 220 / 40%);
+
+	/* Code blocks, on the composer tone. */
+	--tok-comment: #8b8177;
+	--tok-keyword: #e08a72;
+	--tok-string: #cfcb84;
+	--tok-number: #e6a45c;
+	--tok-function: #dfa08e;
+	--tok-operator: #e0a340;
+	--tok-punctuation: #b5ab9e;
+	--tok-tag: #9fbf6a;
+	--tok-attr: #e6a45c;
+
+	/* TheLounge's variables, mapped onto the tokens. */
+	--body-color: var(--chat-fg);
+	--body-color-muted: var(--chat-fg-muted);
+	--body-bg-color: var(--rail-bg-bottom);
+	--button-color: var(--chat-accent);
+	--button-text-color-hover: var(--chat-accent-fg);
+	--link-color: var(--chat-accent);
+	--window-bg-color: var(--chat-bg);
+	--window-heading-color: var(--chat-heading);
+	--date-marker-color: var(--chat-fg-muted);
+	--unread-marker-color: var(--chat-accent);
+	--highlight-bg-color: var(--chat-highlight-bg);
+	--highlight-border-color: var(--chat-accent);
+	--channel-typing-color: var(--event-join);
+	--channel-activity-color: var(--nick-default);
+	--md-code-color: var(--chat-fg);
+}
+
+/* The rail's gradient is the page's too, so the gutter day.css leaves around
+ * the window continues the sidebar instead of cutting it off. */
+body {
+	background: linear-gradient(180deg, var(--rail-bg-top) 0%, var(--rail-bg-bottom) 100%);
+	scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+::placeholder {
+	color: var(--chat-fg-faint);
+}
+
+::selection {
+	background: var(--chat-selection);
+	color: var(--chat-fg);
+}
+
+.window {
+	box-shadow: 0 0 0 1px var(--window-border), var(--window-shadow);
+}
+
+/* Sidebar rail */
+#sidebar {
+	color: var(--rail-fg);
+	background: linear-gradient(180deg, var(--rail-bg-top) 0%, var(--rail-bg-bottom) 100%);
+}
+
+.jump-to-input .input {
+	color: var(--rail-fg-active);
+	background-color: var(--rail-input-bg);
+	box-shadow: inset 0 0 0 1px var(--rail-input-border);
+}
+
+.jump-to-input .input:focus {
+	box-shadow: inset 0 0 0 1px var(--rail-input-border), 0 0 0 3px var(--focus-ring);
+}
+
+.jump-to-input .input::placeholder,
+.jump-to-input::before {
+	color: var(--rail-fg-muted);
+}
+
+.channel-list-item:hover,
+#footer button:hover {
+	background-color: var(--rail-item-hover-bg);
+}
+
+#footer button:hover,
+#footer button.active,
+.channel-list-item:hover,
+.channel-list-item.active {
+	color: var(--rail-fg-active);
+}
+
+#footer button.active,
+.channel-list-item.active {
+	background-color: var(--rail-item-active-bg);
+}
+
+/* The active row's 2px amber marker, as an inset shadow so nothing moves. */
+.channel-list-item.active {
+	box-shadow: inset 2px 0 0 var(--rail-accent);
+}
+
+.channel-list-item .badge {
+	background: var(--rail-badge-bg);
+	color: var(--rail-badge-fg);
+}
+
+.channel-list-item .badge.highlight {
+	background: var(--rail-accent);
+	color: var(--rail-accent-fg);
+}
+
+.channel-list-item.has-highlight:not(.is-muted) .name {
+	color: var(--rail-fg-strong);
+}
+
+.channel-list-item[data-type="lobby"] {
+	color: var(--rail-fg-strong);
+}
+
+.channel-list-item[data-type="lobby"]:hover,
+.channel-list-item[data-type="lobby"].active {
+	color: var(--rail-fg-active);
+}
+
+.channel-list-item.not-connected,
+.channel-list-item.parted-channel,
+.channel-list-item.not-connected:hover,
+.channel-list-item.not-connected.active,
+.channel-list-item.parted-channel:hover,
+.channel-list-item.parted-channel.active {
+	color: var(--event-quit);
+}
+
+.channel-list-item .close::before,
+.channel-list-item[data-type="lobby"] .add-channel::before,
+.channel-list-item[data-type="lobby"] .edit-network::before,
+#sidebar .network .collapse-network-icon::before {
+	color: var(--rail-fg-strong);
+}
+
+.channel-list-item .connection-status-icon.is-connected::before,
+.channel-list-item .notify-status-icon.on::before {
+	color: var(--event-join);
+}
+
+.channel-list-item .connection-status-icon.is-connecting::before {
+	color: var(--rail-accent);
+}
+
+.channel-list-item .connection-status-icon.is-disconnected::before {
+	color: var(--event-quit);
+}
+
+.channel-list-item .notify-status-icon.enabled::before,
+.channel-list-item .notify-status-icon.off::before,
+#footer button {
+	color: var(--rail-fg-muted);
+}
+
+.ui-sortable-ghost::after,
+.ui-sortable-dragging-touch-cue:not(.ui-sortable-dragging)::after {
+	border-color: var(--rail-fg-muted);
+	background: var(--rail-bg-bottom);
+}
+
+/* Channel header, user list */
+#viewport .lt,
+#viewport .rt,
+#chat button.mentions,
+#chat button.search,
+#chat button.menu,
+#chat button.close,
+.topic-container .save-topic span,
+#chat form.message-search button {
+	color: var(--chat-fg-muted);
+}
+
+#viewport .lt::after {
+	background-color: var(--chat-accent);
+}
+
+#chat .content,
+#chat .header,
+#chat .user-mode::before,
+#chat .userlist {
+	border-color: var(--chat-rule);
+}
+
+.header .topic-input {
+	border-color: var(--composer-border);
+}
+
+#chat .userlist .count,
+form.message-search input {
+	background-color: var(--composer-bg);
+}
+
+form.message-search input::placeholder {
+	color: var(--chat-fg-faint);
+}
+
+#chat .count::before {
+	color: var(--chat-fg-faint);
+}
+
+/* Messages */
+.user {
+	color: var(--nick-default);
+}
+
+.user.color-1 { color: #fa9b9b; }
+.user.color-2 { color: #fa9d8c; }
+.user.color-3 { color: #f8a07d; }
+.user.color-4 { color: #f3a571; }
+.user.color-5 { color: #ecaa66; }
+.user.color-6 { color: #e3af5f; }
+.user.color-7 { color: #d9b55c; }
+.user.color-8 { color: #ccba5e; }
+.user.color-9 { color: #bec065; }
+.user.color-10 { color: #aec56e; }
+.user.color-11 { color: #9dc97b; }
+.user.color-12 { color: #8bcd89; }
+.user.color-13 { color: #79cf99; }
+.user.color-14 { color: #67d1a9; }
+.user.color-15 { color: #58d1b9; }
+.user.color-16 { color: #4cd1c8; }
+.user.color-17 { color: #7dc8cc; }
+.user.color-18 { color: #7ec7d5; }
+.user.color-19 { color: #82c5dc; }
+.user.color-20 { color: #89c2e2; }
+.user.color-21 { color: #91bfe7; }
+.user.color-22 { color: #9abce9; }
+.user.color-23 { color: #a4b8ea; }
+.user.color-24 { color: #aeb5e9; }
+.user.color-25 { color: #b8b2e7; }
+.user.color-26 { color: #c6a8f7; }
+.user.color-27 { color: #d3a4ee; }
+.user.color-28 { color: #dea0e3; }
+.user.color-29 { color: #e79dd7; }
+.user.color-30 { color: #ef9bc9; }
+.user.color-31 { color: #f59aba; }
+.user.color-32 { color: #f99aaa; }
+
+/* mIRC colours that vanish on a dark surface (navy, maroon, blue). */
+.irc-fg2 { color: #0074d9; }
+.irc-fg5 { color: #e969a7; }
+.irc-fg12 { color: #50a8ff; }
+
+#chat .msg[data-type="login"] .from::before,
+#chat .msg[data-type="topic"] .from::before,
+#chat .msg[data-type="mode_channel"] .from::before,
+#chat .msg[data-type="mode_user"] .from::before,
+#chat .msg[data-type="mode"] .from::before,
+#chat .msg[data-type="whois"] .from::before,
+#chat .msg[data-type="nick"] .from::before,
+#chat .msg[data-type="chghost"] .from::before,
+#chat .msg[data-type="join"] .from::before,
+#chat .msg.self[data-type="raw"] .from::before,
+#help .report-issue-link::before {
+	color: var(--event-join);
+}
+
+#chat .msg[data-type="logout"] .from::before,
+#chat .msg[data-type="part"] .from::before,
+#chat .msg[data-type="quit"] .from::before,
+#chat .msg[data-type="kick"] .from::before,
+#chat .msg[data-type="error"],
+#chat .msg[data-type="error"] .from,
+#chat .msg.channel_list_truncated .text,
+#chat .media-veil.failed .media-veil-icon,
+#chat .msg-action-delete:hover,
+#chat .msg-action-delete:focus-visible {
+	color: var(--event-quit);
+}
+
+#chat .msg[data-type="action"] .from,
+#chat .msg[data-type="action"] .content,
+#chat .msg[data-type="action"] .user {
+	color: var(--action-color);
+}
+
+#chat .msg[data-type="notice"] .time,
+#chat .msg[data-type="wallops"] .time,
+#chat .msg[data-type="notice"] .content,
+#chat .msg[data-type="wallops"] .content,
+#chat .msg[data-type="notice"] .user,
+#chat .msg[data-type="wallops"] .user {
+	color: var(--notice-color);
+}
+
+#chat .chat-view[data-type="channel"] .msg.highlight .time,
+#chat .msg.channel_list_loading .text,
+#chat .toggle-content .body,
+#chat .toggle-type-error {
+	color: var(--chat-fg-muted);
+}
+
+#chat .msg-statusmsg {
+	background-color: var(--chat-accent);
+	color: var(--chat-accent-fg);
+}
+
+/* The day divider is a hairline; the new-messages divider is the amber one. */
+#chat .date-marker::before {
+	border-top-color: var(--composer-border);
+}
+
+#chat .unread-marker::before {
+	border-top-color: var(--chat-accent-rule);
+}
+
+#chat table.channel-list th,
+#chat table.ban-list th,
+#chat table.invite-list th,
+#chat table.ignore-list th,
+#chat table.channel-list td,
+#chat table.ban-list td,
+#chat table.invite-list td {
+	border-bottom-color: var(--chat-rule);
+}
+
+#chat .msg[data-type="monospace_block"] .text,
+#chat .toggle-content,
+code,
+.irc-monospace,
+pre {
+	background: var(--composer-bg);
+	color: var(--chat-fg);
+}
+
+kbd {
+	color: var(--chat-fg);
+	text-shadow: none;
+	background-color: var(--composer-bg);
+	background-image: none;
+	border-color: var(--composer-border);
+	box-shadow: 0 2px 0 var(--composer-border);
+}
+
+#chat .msg-reaction.self {
+	background: var(--accent-tint-20);
+}
+
+.reaction-picker-option.active {
+	background: var(--accent-tint-30);
+}
+
+#chat .msg-action:hover,
+#chat .msg-action:focus-visible,
+#form .compose-bar-cancel:hover,
+#form .compose-bar-cancel:focus-visible,
+#form .upload-bar-track,
+.context-menu-divider,
+.context-menu-item.active,
+.textcomplete-item:focus,
+.textcomplete-item:hover,
+.textcomplete-menu .active,
+#chat .userlist .user.active {
+	background-color: var(--tint-strong);
+}
+
+#form .compose-bar,
+#form .upload-bar {
+	background: var(--tint-soft);
+}
+
+/* Message form */
+#form {
+	background: var(--composer-bg);
+	border-top-color: var(--composer-border);
+	color: var(--chat-fg);
+}
+
+#form #nick {
+	background: var(--chat-bg);
+	color: var(--chat-fg-muted);
+}
+
+#form #upload {
+	color: var(--chat-fg-muted);
+}
+
+#form #submit,
+#form #submit::before {
+	color: var(--chat-accent);
+}
+
+#user-visible-error {
+	background: var(--event-quit);
+	color: var(--chat-bg);
+}
+
+/* Inputs, buttons, menus */
+.input {
+	background-color: var(--composer-bg);
+	border-color: var(--composer-border);
+	color: var(--chat-fg);
+}
+
+.input:disabled {
+	background-color: var(--chat-rule);
+}
+
+.input:not(:disabled):hover,
+.input:not(:disabled):focus {
+	border-color: var(--chat-accent);
+}
+
+.input:focus,
+.btn:active,
+.btn:focus {
+	box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.mentions-popup,
+#context-menu,
+.textcomplete-menu {
+	background-color: var(--menu-bg);
+	border-color: var(--window-border);
+}
+
+.context-menu-item,
+.textcomplete-item,
+.textcomplete-item a {
+	color: var(--chat-fg);
+}
+
+/* Connect form, settings, version checker */
+#connect .connect-notice,
+#connect .saved-networks-empty,
+#connect .connect-note,
+#version-checker.loading {
+	background-color: var(--note-bg);
+	color: var(--note-fg);
+}
+
+#connect .connect-link-notice,
+#version-checker.new-version,
+#version-checker.new-packages {
+	background-color: var(--warn-bg);
+	color: var(--warn-fg);
+}
+
+#version-checker.error {
+	background-color: var(--error-bg);
+	color: var(--error-fg);
+}
+
+#version-checker.up-to-date {
+	background-color: var(--ok-bg);
+	color: var(--ok-fg);
+}
+
+#connect .connection-status.is-connected::before,
+.network-settings-status.is-connected::before,
+#settings #change-password .success {
+	color: var(--event-join);
+}
+
+#connect .connection-status.is-connecting::before,
+.network-settings-status.is-connecting::before {
+	color: var(--chat-accent);
+}
+
+#connect .connection-status.is-disconnected::before,
+#sign-in .error,
+#settings #change-password .error,
+#settings .error,
+.password-container .reveal-password-visible span::before {
+	color: var(--event-quit);
+}
+
+.network-settings-status.is-disconnected::before,
+.password-container .reveal-password span {
+	color: var(--chat-fg-muted);
+}
+
+/* Scrollbars (WebKit; Firefox reads scrollbar-color on body) */
+::-webkit-scrollbar:hover {
+	background-color: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb:vertical {
+	background: var(--scrollbar-thumb);
+}
+
+::-webkit-scrollbar-thumb:vertical:active {
+	background: var(--scrollbar-thumb-active);
+}

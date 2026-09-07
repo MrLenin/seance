@@ -64,8 +64,8 @@ Every field is optional; `{"appName": "Seance"}` (the shipped default) is a comp
 | `defaultNetwork.channels`              | string[]                | none                               | A comma-separated string also works. Names without a prefix get `#`.                                                                                                  |
 | `defaultNetwork.nick`                  | string                  | empty                              | Every `?` (or `%`, TheLounge style) becomes a random digit: `"guest????"` → `guest4821`.                                                                              |
 | `defaultNetwork.lockHost`              | boolean                 | `false`                            | Hide the host/port/TLS fields; the form always connects to `defaultNetwork`.                                                                                          |
-| `theme`                                | string                  | `"default"`                        | Must be a theme in the build (`default`, `morning`). Applies until the user picks a theme in Settings.                                                                |
-| `themeColor`                           | `#rgb(a)`/`#rrggbb(aa)` | `#415364`                          | `<meta name="theme-color">`; build time also fills the manifest `theme_color` / `background_color`.                                                                   |
+| `theme`                                | string                  | `"coffee"`                         | Must be a theme in the build (`coffee`, `creama`, `day`, `morning`; `docs/resources/themes.md`). Applies until the user picks a theme in Settings.                    |
+| `themeColor`                           | `#rgb(a)`/`#rrggbb(aa)` | `#1a1816`                          | `<meta name="theme-color">`; build time also fills the manifest `theme_color` / `background_color`. `coffee` and `creama` set their own once picked.                  |
 | `links.website` / `.help` / `.privacy` | `http(s)` URL           | the Seance repo, its `docs/`, none | Links in the Help window. Set `privacy` to add a "Privacy policy" link.                                                                                               |
 | `features.multiNetwork`                | boolean                 | `true`                             | `false` hides Settings → Networks → Add network once one network exists.                                                                                              |
 | `features.saveNetworks`                | boolean                 | `true`                             | `false` hides Settings → Networks, "remember password" and "connect automatically" on the connect form.                                                               |
@@ -162,7 +162,7 @@ There is no Safari pinned-tab icon. `mask-icon` needs a single-colour SVG silhou
 
 Notifications set `icon` but no `badge`. A badge must be a monochrome silhouette; supply one and add `badge:` in `client/service-worker.js` and `client/js/socket-events/msg.ts` if you have artwork that suits it.
 
-`index.html` hard-codes `msapplication-TileColor` (`#0D0E14`, matching the icon tiles); `theme-color` and the manifest's `theme_color`/`background_color` come from `themeColor` in `config.json`, defaulting to `#415364`.
+`index.html` hard-codes `msapplication-TileColor` (`#0D0E14`, matching the icon tiles); `theme-color` and the manifest's `theme_color`/`background_color` come from `themeColor` in `config.json`, defaulting to `#1a1816` (the `coffee` theme's chrome tone).
 
 ## Subpath deploys
 

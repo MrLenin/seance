@@ -272,7 +272,7 @@ function createWindow() {
 		icon: fs.existsSync(iconFile) ? iconFile : undefined,
 		show: !SMOKE,
 		autoHideMenuBar: process.platform !== "darwin",
-		backgroundColor: "#415364",
+		backgroundColor: "#1a1816",
 		webPreferences: {
 			preload: path.join(__dirname, "preload.js"),
 			contextIsolation: true,

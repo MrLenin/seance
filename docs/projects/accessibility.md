@@ -264,6 +264,16 @@ Morning theme (`#303e4a`): `#f92772` unread marker 2.91, `#e74c3c` error
 Everything else on morning passes; the nick palette was clearly tuned to
 4.5 on the plain backgrounds.
 
+The Ink & Amber themes added 2026-09 (`coffee`, now the default, and `creama`;
+`docs/resources/themes.md`) were built to this section's targets: body and
+muted text ≥ 4.5:1 on the chat surface, icons and the rail's muted tone
+≥ 3:1 (footer icons ≥ 4.5), and generated 32-slot nick palettes at ≥ 4.6:1
+(coffee) / ≥ 5:1 (creama) so a nick still clears 4.5 on a highlighted row.
+Where the design handoff's own values missed its 4.5 rule they were darkened;
+each theme file's header lists the deviations. Their placeholders sit at
+3.2–3.8:1, the one deliberate exception, and the day/morning items below
+still stand.
+
 - [ ] Pick a darker brand green for text/border/focus on light (≥ 4.5:1 on
       `#fff`, e.g. in the `#2f7d3a`–`#3b8a41` range) and keep `#84ce88` as a
       fill with dark text. Same for `--link-color`/`.user`.
