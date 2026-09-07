@@ -195,10 +195,17 @@ export function allClients(): IrcClient[] {
  *
  * `pagehide` fires for tab close, navigation and refresh — on refresh the
  * reconnect after the reload re-attaches the held session, so nothing is
- * lost either way.
+ * lost either way. A `persisted` pagehide is different: the page is going
+ * into the back/forward cache and may come back as it is (`pageshow`
+ * pokes it then), so the socket — if the browser lets it live — is worth
+ * more than the deterministic hold. Nothing is sent for those.
  */
 if (typeof window !== "undefined") {
-	window.addEventListener("pagehide", () => {
+	window.addEventListener("pagehide", (ev: PageTransitionEvent) => {
+		if (ev.persisted) {
+			return;
+		}
+
 		for (const client of allClients()) {
 			if (client.isConnected) {
 				client.send("QUIT :page closed");

@@ -1,56 +1,72 @@
 <template>
 	<ChannelWrapper v-bind="$props" :channel="channel">
-		<button
-			v-if="network.channels.length > 1"
-			:aria-controls="'network-' + network.uuid"
-			:aria-label="getExpandLabel(network)"
-			:aria-expanded="!network.isCollapsed"
-			class="collapse-network"
-			@click.stop="onCollapseClick"
-		>
-			<span class="collapse-network-icon" />
-		</button>
-		<span v-else class="collapse-network" />
+		<!-- Two rows in one tab (see .lobby-wrap in style.css): the name gets
+		     the whole first line; the tools sit left on the second, the nick
+		     right. -->
 		<div class="lobby-wrap">
-			<span :title="channel.name" class="name">{{ channel.name }}</span>
-			<span v-if="channel.unread" :class="{highlight: channel.highlight}" class="badge">{{
-				unreadCount
-			}}</span>
-			<span
-				:aria-label="statusLabel"
-				class="connection-status-tooltip tooltipped tooltipped-w"
-			>
+			<div class="lobby-title">
 				<button
-					:class="['connection-status-icon', statusClass]"
-					:aria-label="statusLabel"
-					@click.stop="onStatusClick"
-				/>
-			</span>
-			<span :aria-label="notifyState.label" :title="notifyState.label" class="notify-tooltip">
-				<span :class="['notify-status-icon', notifyState.cls]" />
-			</span>
+					v-if="network.channels.length > 1"
+					:aria-controls="'network-' + network.uuid"
+					:aria-label="getExpandLabel(network)"
+					:aria-expanded="!network.isCollapsed"
+					class="collapse-network"
+					@click.stop="onCollapseClick"
+				>
+					<span class="collapse-network-icon" />
+				</button>
+				<span v-else class="collapse-network" />
+				<span :title="channel.name" class="name">{{ channel.name }}</span>
+				<span v-if="channel.unread" :class="{highlight: channel.highlight}" class="badge">{{
+					unreadCount
+				}}</span>
+			</div>
+			<div class="lobby-status">
+				<div class="lobby-tools">
+					<span
+						:aria-label="statusLabel"
+						class="connection-status-tooltip tooltipped tooltipped-e"
+					>
+						<button
+							:class="['connection-status-icon', statusClass]"
+							:aria-label="statusLabel"
+							@click.stop="onStatusClick"
+						/>
+					</span>
+					<span
+						:aria-label="notifyState.label"
+						:title="notifyState.label"
+						class="notify-tooltip"
+					>
+						<span :class="['notify-status-icon', notifyState.cls]" />
+					</span>
+					<span
+						aria-label="Edit this network…"
+						class="edit-network-tooltip tooltipped tooltipped-e tooltipped-no-touch"
+					>
+						<button
+							class="edit-network"
+							aria-label="Edit this network…"
+							@click.stop="editNetwork"
+						/>
+					</span>
+					<span
+						:aria-label="joinChannelLabel"
+						class="add-channel-tooltip tooltipped tooltipped-e tooltipped-no-touch"
+					>
+						<button
+							:class="['add-channel', {opened: isJoinChannelShown}]"
+							:aria-controls="'join-channel-' + channel.id"
+							:aria-label="joinChannelLabel"
+							@click.stop="$emit('toggle-join-channel')"
+						/>
+					</span>
+				</div>
+				<span v-if="network.nick" :title="nickLabel" class="lobby-nick"
+					><span class="sr-only">Nickname: </span>{{ network.nick }}</span
+				>
+			</div>
 		</div>
-		<span
-			aria-label="Edit this network…"
-			class="edit-network-tooltip tooltipped tooltipped-w tooltipped-no-touch"
-		>
-			<button
-				class="edit-network"
-				aria-label="Edit this network…"
-				@click.stop="editNetwork"
-			/>
-		</span>
-		<span
-			:aria-label="joinChannelLabel"
-			class="add-channel-tooltip tooltipped tooltipped-w tooltipped-no-touch"
-		>
-			<button
-				:class="['add-channel', {opened: isJoinChannelShown}]"
-				:aria-controls="'join-channel-' + channel.id"
-				:aria-label="joinChannelLabel"
-				@click.stop="$emit('toggle-join-channel')"
-			/>
-		</span>
 	</ChannelWrapper>
 </template>
 
@@ -140,6 +156,14 @@ export default defineComponent({
 			return props.isJoinChannelShown ? "Cancel" : "Join a channel…";
 		});
 
+		// The nick under the network name is the one this connection uses;
+		// before the first connect it is the configured one.
+		const nickLabel = computed(() =>
+			props.network.status.connected
+				? `Your nickname on ${props.network.name}`
+				: `Your nickname for ${props.network.name} (not connected)`
+		);
+
 		const unreadCount = computed(() => {
 			return roundBadgeNumber(channel.value.unread);
 		});
@@ -160,6 +184,7 @@ export default defineComponent({
 			statusLabel,
 			onStatusClick,
 			joinChannelLabel,
+			nickLabel,
 			unreadCount,
 			onCollapseClick,
 			getExpandLabel,

@@ -127,6 +127,22 @@ export default async function run(page) {
 | `sleep(ms)`                                |                                                                                        |
 | `consoleLogs`, `consoleErrors`, `wsFrames` | collected since launch; a frame has `dir`, `requestId` (one per socket), `payloadData` |
 | `send(method, params)`                     | raw CDP, for anything not wrapped                                                      |
+| `expectWsErrors`                           | set true while dials are refused on purpose (a failed dial is otherwise a failure)     |
+
+To take the connection away from under the page — a phone's radio going off —
+connect through `tools/scenarios/lib/irc-proxy.mjs`: `startProxy({port, target})`
+gives `cut()` (drop every proxied socket without a word), `refuse()` /
+`accept()` (every new dial dropped at once, or let through) and `close()`.
+`reconnect-after-backoff.mjs` and `disconnected-channel.mjs` are built on it.
+
+To use a cap the testnet ircd leaves off — nefarious2 gates several behind
+feature flags that default to off, `CAP_draft_read_marker` among them, and
+the rig's conf only sets a few — `tools/scenarios/lib/rig-feature.mjs`
+`rigFeature(feature, value)` logs in as the rig's oper and `SET`s it at
+runtime, returning whether the cap was in `CAP LS` before and after so the
+scenario restores only what it changed. A flip sends `CAP NEW` / `CAP DEL`
+to every cap-notify client on the rig, so keep the window short.
+`push-mark-read.mjs` is the model.
 
 ### Rules that keep a scenario honest
 

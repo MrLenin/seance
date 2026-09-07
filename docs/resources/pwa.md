@@ -76,13 +76,22 @@ Ship `NODE_ENV=production corepack yarn build`.
   token matches, so it stays quiet — `controllerchange` alone could not tell
   the two apart. Installed windows have no reload button, hence the in-app
   one (Ctrl/Cmd+R also works). Browser check:
-  `tools/scenarios/update-signal.mjs` (needs a production build).
+  `tools/scenarios/update-signal.mjs` (needs a production build). The
+  per-network **push-only workers** (`push/<uuid>/`, see
+  `client/js/webpush.ts`) get none of that for free: no navigation ever lands
+  inside their scope, a push event re-checks the script at most once a day,
+  and `register()` with the same URL checks nothing — so the page calls
+  `registration.update()` on every stored network's registration as it boots
+  (`syncStoredWithBrowser`) and whenever a subscribe reuses one
+  (`ensureRegistration`). Browser check:
+  `tools/scenarios/push-worker-update.mjs`.
 - **Notifications.** In-page `Notification`s are routed through the worker
   (`socket-events/msg.ts` → `{type: "notification"}` → `showNotification`), so
   clicking one focuses the app window, or reopens it on `#/chan-<id>` if it was
-  closed. There is **no Web Push**: with no server to hold subscriptions,
-  notifications only arrive while the app is running (in the background is
-  fine on desktop; mobile OSes suspend the WebSocket — see the Capacitor README).
+  closed. Web Push (`draft/webpush`, the ircd holds the subscriptions) covers
+  the app when it is closed or the OS has suspended its WebSocket — one
+  push-only registration per network; see `docs/projects/push-subscription.md`
+  and `push-per-network.md`.
 
 ## Verifying a deploy
 

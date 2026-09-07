@@ -5,8 +5,8 @@
  * registers — into a Node `vm` sandbox with a scripted IRC server and an
  * in-memory notification store, then drives the real handlers: push
  * rendering and per-target merging, the `t:"read"` cross-device relay,
- * notification reply (throwaway-connection PRIVMSG) and the 30m mute
- * (metadata GET-merge-SET).
+ * notification reply (throwaway-connection PRIVMSG) and Mark read (the
+ * page's connection, else a throwaway-connection MARKREAD, else the outbox).
  */
 import {expect} from "chai";
 import {readFileSync} from "node:fs";
@@ -28,7 +28,7 @@ interface Rec {
 		from?: string;
 		target?: string;
 		time?: string;
-		messages?: Array<{from: string; text: string}>;
+		messages?: Array<{from: string; text: string; msgid?: string}>;
 	};
 	actions?: Array<{action: string; type?: string; title: string}>;
 	closed: boolean;
@@ -81,6 +81,10 @@ interface ServerScript {
 	sessionNick?: string;
 	/** A server without `message-tags` (no client tags can be sent). */
 	noMessageTags?: boolean;
+	/** A server without `draft/read-marker` (MARKREAD is an unknown command). */
+	noReadMarker?: boolean;
+	/** Refuse MARKREAD with a FAIL (read-marker storage unavailable). */
+	failMarkRead?: boolean;
 }
 
 /** What the scripted ircd advertises in CAP LS. */
@@ -91,11 +95,11 @@ function capsOffered(script: ServerScript): string[] {
 		"draft/metadata-2",
 		"draft/webpush",
 		...(script.noMessageTags ? [] : ["message-tags"]),
+		...(script.noReadMarker ? [] : ["draft/read-marker"]),
 	];
 }
 
-/** Scripted ircd: replies the way the testnet server does. The mute list
- * value is read from `ws.mute` so tests can pre-seed one. */
+/** Scripted ircd: replies the way the testnet server does. */
 function serve(ws: any, line: string): void {
 	const reply = (s: string): void => {
 		ws.onmessage({data: s});
@@ -161,13 +165,20 @@ function serve(ws: any, line: string): void {
 		}
 	} else if (line.startsWith("WEBPUSH REGISTER ")) {
 		reply(`:irc.testnet.local WEBPUSH REGISTER ${line.split(" ")[2]}`);
-	} else if (line.startsWith("METADATA * GET")) {
-		const v = ws.mute ?? "";
-		reply(
-			v === ""
-				? `:irc.testnet.local 762 ${me()} draft/webpush/mute * :No matching key`
-				: `:irc.testnet.local 761 ${me()} draft/webpush/mute private :${v}`
-		);
+	} else if (line.startsWith("MARKREAD ")) {
+		// m_markread.c: the cap gates the command (421 without it), a stored
+		// marker is echoed to the account's clients, storage trouble is a FAIL.
+		const [, target, param] = line.split(" ");
+
+		if (script.noReadMarker) {
+			reply(`:irc.testnet.local 421 ${me()} MARKREAD :Unknown command`);
+		} else if (script.failMarkRead) {
+			reply(
+				`FAIL MARKREAD TEMPORARILY_UNAVAILABLE ${target} :Read marker storage is not available`
+			);
+		} else {
+			reply(`:irc.testnet.local MARKREAD ${target} ${param}`);
+		}
 	}
 }
 
@@ -193,7 +204,6 @@ class FakeWS {
 	constructor(
 		public url: string,
 		public protocol: string | undefined,
-		public mute: string,
 		public script: ServerScript
 	) {
 		wsInstances.push(this);
@@ -265,7 +275,6 @@ interface SWHarness {
 	kv: Map<string, unknown>;
 	socketsOpened(): number;
 	lastSent(): string[];
-	setMuteList(v: string): void;
 }
 
 interface HarnessOptions {
@@ -283,18 +292,17 @@ interface HarnessOptions {
 
 const SCOPE = "https://app.test/";
 
-function makeSW(muteList = "", options: HarnessOptions = {}): SWHarness {
+function makeSW(options: HarnessOptions = {}): SWHarness {
 	const handlers: Record<string, Array<(ev: any) => void>> = {};
 	const records: Rec[] = [];
 	const shown: Rec[] = [];
 	const opened: string[] = [];
 	const kv = new Map<string, unknown>([["stash", STASH]]);
 	const socketsBefore = wsInstances.length;
-	let muteListValue = muteList;
 
 	class HarnessWS extends FakeWS {
 		constructor(url: string, protocol?: string) {
-			super(url, protocol, muteListValue, options.script ?? {});
+			super(url, protocol, options.script ?? {});
 		}
 	}
 
@@ -464,9 +472,6 @@ function makeSW(muteList = "", options: HarnessOptions = {}): SWHarness {
 		kv,
 		socketsOpened: (): number => wsInstances.length - socketsBefore,
 		lastSent: (): string[] => wsInstances[wsInstances.length - 1].sent,
-		setMuteList(v: string): void {
-			muteListValue = v;
-		},
 	};
 }
 
@@ -526,6 +531,33 @@ function msgPayload(
 		`{"t":"msg","from":"${from}","target":"${target}",` +
 		`"msgid":"${msgid}","time":"2026-09-02T19:59:00.000Z","text":"${text}"}`
 	);
+}
+
+const BATCH_T = "2026-09-02T19:59:00.000Z";
+
+/** One pushed line of a multiline message, in draft/multiline's fallback
+ * form (push-payload-multiline.md §3.2): `batch=<base msgid>` on every
+ * line, the msgid on the first line only, the batch's time and the
+ * ordering tag on every line. */
+function batchLine(
+	msgid: string,
+	index: number,
+	sent: number,
+	total: number,
+	text: string,
+	options: {concat?: boolean; from?: string; target?: string} = {}
+): string {
+	const tags = [
+		`batch=${msgid}`,
+		...(index === 1 ? [`msgid=${msgid}`] : []),
+		`time=${BATCH_T}`,
+		`evilnet.github.io/line=${index}/${sent}/${total}`,
+		...(options.concat ? [CONCAT_TAG] : []),
+	];
+
+	return `@${tags.join(";")} :${options.from ?? "bob"}!u@h PRIVMSG ${
+		options.target ?? "pushtest"
+	} :${text}`;
 }
 
 describe("service worker push notifications", function () {
@@ -641,18 +673,31 @@ describe("service worker push notifications", function () {
 
 	it("reassembles a multiline batch delivered out of order into one notification", async function () {
 		const sw = makeSW();
-		const T = "2026-09-02T19:59:00.000Z";
-		const line = (i: number, text: string, concat = "") =>
-			`@batch=b1;msgid=b1;time=${T};evilnet.github.io/line=${i}/3/3${concat} :bob!u@h PRIVMSG pushtest :${text}`;
+		const line = (i: number, text: string) => batchLine("b1", i, 3, 3, text);
 
+		// Only the first line names the message; the others arrive before it.
 		await firePush(sw, line(3, "```"));
-		await firePush(sw, line(1, "```js"));
 		await firePush(sw, line(2, "let x = 1;"));
+		await firePush(sw, line(1, "```js"));
 
 		const live = sw.records.filter((n) => !n.closed);
 		expect(live).to.have.lengthOf(1);
 		expect(live[0].data.count).to.equal(1);
 		expect(live[0].body).to.equal("let x = 1;");
+		expect(live[0].data.messages![0].msgid, "the batch's msgid, from its first line").to.equal(
+			"b1"
+		);
+	});
+
+	it("glues a concat line onto the one before it", async function () {
+		const sw = makeSW();
+
+		await firePush(sw, batchLine("b3", 1, 2, 2, "one long line "));
+		await firePush(sw, batchLine("b3", 2, 2, 2, "in two chunks", {concat: true}));
+
+		const live = sw.records.filter((n) => !n.closed);
+		expect(live).to.have.lengthOf(1);
+		expect(live[0].body).to.equal("one long line in two chunks");
 	});
 
 	it("reassembles a multiline batch whose pushes arrive at the same time", async function () {
@@ -660,9 +705,7 @@ describe("service worker push notifications", function () {
 		// concurrently, and each one reads the notification's stored state
 		// before writing it back. Every line must survive.
 		const sw = makeSW();
-		const T = "2026-09-02T19:59:00.000Z";
-		const line = (i: number) =>
-			`@batch=b2;msgid=b2;time=${T};evilnet.github.io/line=${i}/5/5 :bob!u@h PRIVMSG pushtest :line ${i}`;
+		const line = (i: number) => batchLine("b2", i, 5, 5, `line ${i}`);
 
 		await Promise.all([1, 2, 3, 4, 5].map((i) => firePush(sw, line(i))));
 
@@ -771,44 +814,6 @@ describe("service worker push notifications", function () {
 		expect(sw.opened).to.have.lengthOf(1);
 	});
 
-	it("mutes 30 minutes via metadata GET-merge-SET", async function () {
-		const sw = makeSW();
-		sw.setMuteList("otherchan:1799999999");
-
-		await firePush(sw, msgPayload("alice", "pushtest", "silence me"));
-		const rec = sw.records.filter((n) => !n.closed)[0];
-		await fireClick(sw, rec, "mute30");
-
-		const sent = sw.lastSent().join("\n");
-		const match = sent.match(/METADATA \* SET draft\/webpush\/mute \* :([^\r\n]+)/);
-		expect(match, "SET line sent").to.exist;
-
-		const entries = match![1].split(";");
-		expect(entries).to.contain("otherchan:1799999999"); // preserved
-
-		const mine = entries.find((e) => e.startsWith("alice:"));
-		expect(mine, "alice muted").to.exist;
-
-		const until = Number(mine!.split(":")[1]);
-		expect(until).to.be.within(
-			Math.floor(Date.now() / 1000) + 1790,
-			Math.floor(Date.now() / 1000) + 1810
-		);
-	});
-
-	it("starts the mute list from empty when none exists", async function () {
-		const sw = makeSW();
-
-		await firePush(sw, msgPayload("alice", "pushtest", "mute me"));
-		const rec = sw.records.filter((n) => !n.closed)[0];
-		await fireClick(sw, rec, "mute30");
-
-		const sent = sw.lastSent().join("\n");
-		const match = sent.match(/METADATA \* SET draft\/webpush\/mute \* :([^\r\n]+)/);
-		expect(match, "SET line sent").to.exist;
-		expect(match![1]).to.match(/^alice:\d+$/);
-	});
-
 	it("drops a push whose msgid the live page already saw", async function () {
 		const sw = makeSW();
 		const msgid = "BjAAAaBjzZ0";
@@ -834,12 +839,13 @@ describe("service worker push notifications", function () {
 		expect(sw.shown, "raw-line msgid not in the ring still shows").to.have.lengthOf(2);
 	});
 
-	it("puts Mute 30m on the left and Reply on the right (thumb reach on a phone)", async function () {
+	it("puts Mark read on the left and Reply on the right (thumb reach on a phone)", async function () {
 		const sw = makeSW();
 
 		await firePush(sw, msgPayload("alice", "pushtest", "hello there"));
 
-		expect(sw.shown[0].actions!.map((a) => a.action)).to.deep.equal(["mute30", "reply"]);
+		expect(sw.shown[0].actions!.map((a) => a.action)).to.deep.equal(["markread", "reply"]);
+		expect(sw.shown[0].actions![0].title).to.equal("Mark read");
 		expect(sw.shown[0].actions![1].type, "the reply is the inline text field").to.equal("text");
 	});
 
@@ -861,13 +867,48 @@ describe("service worker push notifications", function () {
 
 	it("remembers a shown batch line by line, so the other lines still land", async function () {
 		const sw = makeSW();
-		const T = "2026-09-02T19:59:00.000Z";
-		const line = (i: number, text: string) =>
-			`@batch=b7;msgid=b7;time=${T};evilnet.github.io/line=${i}/2/2 :bob!u@h PRIVMSG pushtest :${text}`;
+		const line = (i: number, text: string) => batchLine("b7", i, 2, 2, text);
 
 		await firePush(sw, line(1, "one"));
 		await firePush(sw, line(1, "one")); // redelivered
 		await firePush(sw, line(2, "two"));
+		await firePush(sw, line(2, "two")); // redelivered: no msgid to go by
+
+		const live = sw.records.filter((n) => !n.closed);
+		expect(live).to.have.lengthOf(1);
+		expect(live[0].body).to.equal("one\ntwo");
+		expect(live[0].data.count).to.equal(1);
+		expect(sw.shown, "the redelivered lines showed nothing").to.have.lengthOf(2);
+	});
+
+	it("drops every line of a multiline message the live page took, whichever arrives first", async function () {
+		const sw = makeSW();
+		const line = (i: number, text: string) => batchLine("b8", i, 3, 3, text);
+
+		// The page recorded the msgid from the BATCH opener (push-seen.ts);
+		// the later lines carry no msgid, so it is their batch reference
+		// that must be matched against the ring.
+		sw.kv.set("seen", ["b8"]);
+
+		await firePush(sw, line(2, "two"));
+		await firePush(sw, line(1, "one"));
+		await firePush(sw, line(3, "three"));
+
+		expect(sw.shown).to.have.lengthOf(0);
+		expect(sw.records.filter((n) => !n.closed)).to.have.lengthOf(0);
+	});
+
+	it("still takes the earlier line shape, with the batch and msgid tags on every line", async function () {
+		// What a server predating the fallback form pushes. The client ships
+		// first, so for a while both shapes reach the same worker; the extra
+		// msgid changes nothing, the batch tag is the key either way.
+		const sw = makeSW();
+		const line = (i: number, text: string) =>
+			`@batch=b9;msgid=b9;time=${BATCH_T};evilnet.github.io/line=${i}/2/2 :bob!u@h PRIVMSG pushtest :${text}`;
+
+		await firePush(sw, line(2, "two"));
+		await firePush(sw, line(1, "one"));
+		await firePush(sw, line(2, "two")); // redelivered
 
 		const live = sw.records.filter((n) => !n.closed);
 		expect(live).to.have.lengthOf(1);
@@ -901,7 +942,7 @@ describe("service worker push notifications", function () {
 	});
 
 	it("shows the generic notification when IndexedDB rejects", async function () {
-		const sw = makeSW("", {failIndexedDB: true});
+		const sw = makeSW({failIndexedDB: true});
 
 		await firePush(sw, msgPayload("alice", "pushtest", "hello there"));
 
@@ -913,7 +954,7 @@ describe("service worker push notifications", function () {
 
 describe("service worker push notifications (inline fallback, js/push.js not loaded)", function () {
 	it("renders a PM with control bytes stripped and Markdown left literal", async function () {
-		const sw = makeSW("", {noPushModule: true});
+		const sw = makeSW({noPushModule: true});
 
 		await firePush(
 			sw,
@@ -926,7 +967,7 @@ describe("service worker push notifications (inline fallback, js/push.js not loa
 	});
 
 	it("merges a second push for the same target into a two-line body", async function () {
-		const sw = makeSW("", {noPushModule: true});
+		const sw = makeSW({noPushModule: true});
 
 		await firePush(
 			sw,
@@ -975,7 +1016,7 @@ describe("service worker reply pipeline", function () {
 	this.timeout(8000);
 
 	it("registers under a random nick and recovers from 433", async function () {
-		const sw = makeSW("", {script: {nickTaken: true}});
+		const sw = makeSW({script: {nickTaken: true}});
 		const rec = await pushed(sw);
 
 		await fireClick(sw, rec, "reply", {reply: "on my way"});
@@ -993,7 +1034,7 @@ describe("service worker reply pipeline", function () {
 	});
 
 	it("sends a channel reply once the bouncer replayed the JOIN, not at 001", async function () {
-		const sw = makeSW("", {script: {joinReplay: ["#seance"], sessionNick: "pushtest1-pg"}});
+		const sw = makeSW({script: {joinReplay: ["#seance"], sessionNick: "pushtest1-pg"}});
 
 		await firePush(sw, hlPayload("alice", "#seance", "hey pushtest1"));
 		const rec = sw.records.filter((n) => !n.closed)[0];
@@ -1020,7 +1061,7 @@ describe("service worker reply pipeline", function () {
 	});
 
 	it("retries a channel reply once after a 404 from the replay race", async function () {
-		const sw = makeSW("", {script: {joinReplay: ["#seance"], refuseFirst: true}});
+		const sw = makeSW({script: {joinReplay: ["#seance"], refuseFirst: true}});
 
 		await firePush(sw, hlPayload("alice", "#seance", "hey pushtest1"));
 		const rec = sw.records.filter((n) => !n.closed)[0];
@@ -1057,7 +1098,7 @@ describe("service worker reply pipeline", function () {
 
 	it("hands the reply to an open page first and opens no socket", async function () {
 		const client = makeClient(() => true);
-		const sw = makeSW("", {clients: [client]});
+		const sw = makeSW({clients: [client]});
 		const rec = await pushed(sw);
 
 		await fireClick(sw, rec, "reply", {reply: "via page"});
@@ -1075,7 +1116,7 @@ describe("service worker reply pipeline", function () {
 
 	it("uses its own connection when the page does not answer (frozen)", async function () {
 		const frozen = makeClient(); // never acks
-		const sw = makeSW("", {clients: [frozen]});
+		const sw = makeSW({clients: [frozen]});
 		const rec = await pushed(sw);
 
 		await fireClick(sw, rec, "reply", {reply: "page is frozen"});
@@ -1088,7 +1129,7 @@ describe("service worker reply pipeline", function () {
 
 	it("uses its own connection when the page reports it cannot send", async function () {
 		const offline = makeClient(() => false); // network disconnected in the page
-		const sw = makeSW("", {clients: [offline]});
+		const sw = makeSW({clients: [offline]});
 		const rec = await pushed(sw);
 
 		await fireClick(sw, rec, "reply", {reply: "page offline"});
@@ -1127,7 +1168,7 @@ describe("service worker reply pipeline", function () {
 	});
 
 	it("replies as an IRCv3 reply to the newest message when the server has message-tags", async function () {
-		const sw = makeSW("", {script: {joinReplay: ["#seance"]}});
+		const sw = makeSW({script: {joinReplay: ["#seance"]}});
 
 		await firePush(sw, "@msgid=BjAAAaBjrep1 :alice!u@h PRIVMSG #seance :hey pushtest1");
 		await firePush(sw, "@msgid=BjAAAaBjrep2 :alice!u@h PRIVMSG #seance :still there?");
@@ -1139,8 +1180,21 @@ describe("service worker reply pipeline", function () {
 		expect(sent).to.include("@+draft/reply=BjAAAaBjrep2 PRIVMSG #seance :yes");
 	});
 
+	it("answers a multiline message by its msgid even when its first line arrived last", async function () {
+		const sw = makeSW({script: {joinReplay: ["#seance"]}});
+		const line = (i: number, text: string) =>
+			batchLine("BjAAAaBjml1", i, 2, 2, text, {from: "alice", target: "#seance"});
+
+		await firePush(sw, line(2, "are you there?"));
+		await firePush(sw, line(1, "hey pushtest1"));
+		const rec = sw.records.filter((n) => !n.closed)[0];
+		await fireClick(sw, rec, "reply", {reply: "yes"});
+
+		expect(sw.lastSent()).to.include("@+draft/reply=BjAAAaBjml1 PRIVMSG #seance :yes");
+	});
+
 	it("sends a plain PRIVMSG when the server offers no message-tags", async function () {
-		const sw = makeSW("", {script: {noMessageTags: true}});
+		const sw = makeSW({script: {noMessageTags: true}});
 
 		await firePush(sw, "@msgid=BjAAAaBjrep3 :alice!u@h PRIVMSG pushtest :hey");
 		const rec = sw.records.filter((n) => !n.closed)[0];
@@ -1155,7 +1209,7 @@ describe("service worker reply pipeline", function () {
 
 	it("hands the page the reply's msgid and a deadline", async function () {
 		const client = makeClient(() => true);
-		const sw = makeSW("", {clients: [client]});
+		const sw = makeSW({clients: [client]});
 
 		await firePush(sw, "@msgid=BjAAAaBjrep4 :alice!u@h PRIVMSG pushtest :hey");
 		const rec = sw.records.filter((n) => !n.closed)[0];
@@ -1188,7 +1242,7 @@ describe("service worker reply pipeline", function () {
 		hidden.focused = false;
 		hidden.visibilityState = "hidden";
 		const visible = makeClient(() => true);
-		const sw = makeSW("", {clients: [hidden, visible]});
+		const sw = makeSW({clients: [hidden, visible]});
 		const rec = await pushed(sw);
 
 		await fireClick(sw, rec, "reply", {reply: "once"});
@@ -1201,7 +1255,7 @@ describe("service worker reply pipeline", function () {
 	it("moves on to the next page when the first cannot send", async function () {
 		const offline = makeClient(() => false);
 		const online = makeClient(() => true);
-		const sw = makeSW("", {clients: [offline, online]});
+		const sw = makeSW({clients: [offline, online]});
 		const rec = await pushed(sw);
 
 		await fireClick(sw, rec, "reply", {reply: "second page"});
@@ -1234,7 +1288,7 @@ describe("service worker notification click", function () {
 
 	it("tells an open page which conversation to show and focuses it", async function () {
 		const client = makeClient();
-		const sw = makeSW("", {clients: [client]});
+		const sw = makeSW({clients: [client]});
 		const rec = await pushed(sw, "#seance");
 
 		await fireClick(sw, rec, "");
@@ -1352,7 +1406,7 @@ describe("service worker build announcement", function () {
 	it("tells every open window its build once it has claimed them", async function () {
 		const a = makeClient();
 		const b = makeClient();
-		const sw = makeSW("", {clients: [a, b]});
+		const sw = makeSW({clients: [a, b]});
 		let postedAtClaim = -1;
 
 		withActivation(sw, () => {
@@ -1369,11 +1423,143 @@ describe("service worker build announcement", function () {
 
 	it("a push-only worker announces nothing (its build's root worker does)", async function () {
 		const a = makeClient();
-		const sw = makeSW("", {clients: [a], scope: `${SCOPE}push/net-1/`});
+		const sw = makeSW({clients: [a], scope: `${SCOPE}push/net-1/`});
 		withActivation(sw);
 
 		await activate(sw);
 
 		expect(a.posted).to.deep.equal([]);
+	});
+});
+
+describe("service worker mark read", function () {
+	this.timeout(8000); // a frozen page is given 2.5 s before the worker moves on
+
+	/** msgPayload's `time`: the notification's newest message. */
+	const T = "2026-09-02T19:59:00.000Z";
+
+	it("marks the conversation read over a throwaway connection, at the notification's newest time", async function () {
+		const sw = makeSW();
+		const rec = await pushed(sw);
+
+		await fireClick(sw, rec, "markread");
+
+		const sent = sw.lastSent();
+		expect(sent).to.include("CAP REQ :sasl draft/read-marker");
+		expect(sent).to.include(`MARKREAD alice timestamp=${T}`);
+		expect(sent).to.include("QUIT :done");
+		expect(rec.closed).to.equal(true);
+		expect(sw.opened, "no window opened").to.have.lengthOf(0);
+		expect(sw.kv.get("outbox")).to.equal(undefined);
+	});
+
+	it("marks a channel read at 001, without waiting for the bouncer's JOIN replay", async function () {
+		const sw = makeSW();
+		await firePush(
+			sw,
+			"@msgid=BjAAAaBjmr1;time=2026-09-02T20:00:00.000Z :bob!u@h PRIVMSG #seance :hey pushtest1"
+		);
+		const rec = sw.records.filter((n) => !n.closed)[0];
+
+		await fireClick(sw, rec, "markread");
+
+		expect(sw.lastSent()).to.include("MARKREAD #seance timestamp=2026-09-02T20:00:00.000Z");
+		expect(rec.closed).to.equal(true);
+	});
+
+	it("marks read at the time of the click when the push carried no time", async function () {
+		const sw = makeSW();
+		const before = Date.now();
+		await firePush(sw, "@msgid=BjAAAaBjmr2 :alice!u@h PRIVMSG pushtest :no time tag");
+		const rec = sw.records.filter((n) => !n.closed)[0];
+
+		await fireClick(sw, rec, "markread");
+
+		const line = sw.lastSent().find((l) => l.startsWith("MARKREAD alice timestamp="));
+		expect(line, "MARKREAD sent").to.be.a("string");
+		const stamp = Date.parse(line!.slice("MARKREAD alice timestamp=".length));
+		expect(stamp).to.be.within(before, Date.now());
+	});
+
+	it("hands mark-read to an open page first and opens no socket", async function () {
+		const client = makeClient(() => true);
+		const sw = makeSW({clients: [client]});
+		const rec = await pushed(sw);
+
+		await fireClick(sw, rec, "markread");
+
+		expect(client.posted).to.have.lengthOf(1);
+		expect(client.posted[0]).to.include({
+			type: "markread",
+			network: "net-1",
+			target: "alice",
+			time: T,
+		});
+		expect(client.posted[0].deadline).to.be.a("number");
+		expect(sw.socketsOpened(), "no throwaway connection").to.equal(0);
+		expect(rec.closed).to.equal(true);
+	});
+
+	it("uses its own connection when the page does not answer (frozen)", async function () {
+		const frozen = makeClient(); // never acks
+		const sw = makeSW({clients: [frozen]});
+		const rec = await pushed(sw);
+
+		await fireClick(sw, rec, "markread");
+
+		expect(frozen.posted).to.have.lengthOf(1);
+		expect(sw.socketsOpened()).to.equal(1);
+		expect(sw.lastSent()).to.include(`MARKREAD alice timestamp=${T}`);
+		expect(rec.closed).to.equal(true);
+	});
+
+	it("queues the marker for the page when nothing can send it, and does not open the app", async function () {
+		const sw = makeSW();
+		// Password not remembered: the stash knows the network, not the login.
+		sw.kv.set("stash", {
+			...STASH,
+			networks: [{...STASH.networks[0], saslPassword: undefined}],
+		});
+		const rec = await pushed(sw);
+
+		await fireClick(sw, rec, "markread");
+
+		expect(sw.socketsOpened(), "cannot log in").to.equal(0);
+		const outbox = sw.kv.get("outbox") as any[];
+		expect(outbox).to.have.lengthOf(1);
+		expect(outbox[0]).to.include({
+			type: "markread",
+			network: "net-1",
+			target: "alice",
+			time: T,
+		});
+		expect(sw.opened, "a marker is nothing to type, so no window").to.have.lengthOf(0);
+		expect(rec.closed, "closed here even so").to.equal(true);
+	});
+
+	it("queues the marker when the server offers no read-marker cap", async function () {
+		const sw = makeSW({script: {noReadMarker: true}});
+		const rec = await pushed(sw);
+
+		await fireClick(sw, rec, "markread");
+
+		const sent = sw.lastSent();
+		expect(sent).to.include("CAP REQ :sasl");
+		expect(
+			sent.some((l) => l.startsWith("MARKREAD")),
+			"no MARKREAD without the cap"
+		).to.equal(false);
+		expect(sw.kv.get("outbox")).to.have.lengthOf(1);
+		expect(rec.closed).to.equal(true);
+	});
+
+	it("queues the marker when the server refuses it", async function () {
+		const sw = makeSW({script: {failMarkRead: true}});
+		const rec = await pushed(sw);
+
+		await fireClick(sw, rec, "markread");
+
+		expect(sw.lastSent()).to.include(`MARKREAD alice timestamp=${T}`);
+		expect(sw.kv.get("outbox")).to.have.lengthOf(1);
 	});
 });

@@ -274,6 +274,20 @@ async function pushRegistration(uuid: string): Promise<ServiceWorkerRegistration
 	return registration && registration.scope === scopeUrl(uuid) ? registration : undefined;
 }
 
+/** Ask the browser to re-fetch a push-only registration's worker. Nothing
+ * else ever does: a worker re-checks its script on a navigation inside its
+ * scope (the page never navigates inside `push/<uuid>/`), on a push event
+ * only when the last check is a day old, and on `register()` only when the
+ * script URL changed — so a device that subscribed before a deploy would
+ * keep the old worker, and with it the old notification actions and reply
+ * path. Fire and forget: `update()` rejects offline or while an install is
+ * already under way, and the worker in place keeps working either way. */
+function checkForNewWorker(registration: ServiceWorkerRegistration): void {
+	registration.update().catch(() => {
+		// offline, or an install already under way
+	});
+}
+
 /** Wait until a registration has an active worker (a fresh registration
  * installs first; `navigator.serviceWorker.ready` is the root's only). */
 async function awaitActive(registration: ServiceWorkerRegistration): Promise<void> {
@@ -306,6 +320,11 @@ async function awaitActive(registration: ServiceWorkerRegistration): Promise<voi
 /** The network's push-only registration, created and activated on demand. */
 async function ensureRegistration(uuid: string): Promise<ServiceWorkerRegistration> {
 	const existing = await pushRegistration(uuid);
+
+	if (existing) {
+		checkForNewWorker(existing);
+	}
+
 	const registration =
 		existing ??
 		(await navigator.serviceWorker.register("service-worker.js", {scope: pushScopePath(uuid)}));
@@ -379,7 +398,10 @@ async function dropRootSubscription(): Promise<void> {
  * registration or no subscription → the entry goes (the device lost it; the
  * next connect re-subscribes silently under a granted permission); another
  * endpoint (the worker renewed it) → the entry follows. {@link autoRegister}
- * waits for this so it never re-registers a dead endpoint. */
+ * waits for this so it never re-registers a dead endpoint. Every
+ * registration found is also asked for a newer worker
+ * ({@link checkForNewWorker}): this is the one moment a deploy reaches the
+ * push-only workers already installed on a device. */
 async function syncStoredWithBrowser(): Promise<void> {
 	if (!browserSupported()) {
 		return;
@@ -390,6 +412,11 @@ async function syncStoredWithBrowser(): Promise<void> {
 	for (const uuid of Object.keys(subs)) {
 		try {
 			const registration = await pushRegistration(uuid);
+
+			if (registration) {
+				checkForNewWorker(registration);
+			}
+
 			const live = registration ? await registration.pushManager.getSubscription() : null;
 
 			if (!live) {
@@ -420,7 +447,9 @@ async function syncStoredWithBrowser(): Promise<void> {
 	}
 }
 
-const synced: Promise<void> = syncStoredWithBrowser();
+/** {@link syncStoredWithBrowser}, started at boot once the stored entries
+ * are loaded (below) — started any earlier it would sweep an empty map. */
+let synced: Promise<void> = Promise.resolve();
 
 // --- per-network decisions ---------------------------------------------------
 
@@ -849,11 +878,13 @@ function networkPushInfo(uuid: string): {
 	};
 }
 
-// Boot: load what is stored (migrating the old shape), then replace the
-// stub's "unsupported" with what this browser can do. Servers announce
-// themselves (and re-register stored entries) via `webpush:available` as
-// they connect.
+// Boot: load what is stored (migrating the old shape), reconcile it with the
+// browser — which is also when every network's push-only worker is asked to
+// update — then replace the stub's "unsupported" with what this browser can
+// do. Servers announce themselves (and re-register stored entries) via
+// `webpush:available` as they connect; they wait for the reconciliation.
 loadStored();
+synced = syncStoredWithBrowser();
 refreshState();
 
 // Opening the app means the user is catching up in-app: drop any push
@@ -885,7 +916,11 @@ socket.on("init", async () => {
 
 /** A reply typed into a notification, as the worker hands it over: by
  * network uuid + target name (the page's channel ids mean nothing to it). */
+/** A reply typed into a notification: relayed by the service worker
+ * (bus-contract §2.2) or queued in its outbox. */
 interface QueuedReply {
+	/** Absent on entries an earlier build queued: those are replies. */
+	type?: "reply";
 	network: string;
 	target: string;
 	text: string;
@@ -898,13 +933,30 @@ interface QueuedReply {
 	deadline?: number;
 }
 
+/** A notification's Mark read: the account's read marker for `target` at
+ * `time` (the notification's newest message), relayed or queued like a
+ * reply. */
+interface QueuedMarkRead {
+	type: "markread";
+	network: string;
+	target: string;
+	time: string;
+	deadline?: number;
+}
+
+type OutboxEntry = QueuedReply | QueuedMarkRead;
+
 const OUTBOX_KEY = "outbox";
+
+function networkUp(uuid: string): boolean {
+	const network = store.getters.findNetwork(uuid);
+
+	return Boolean(network && network.status.connected);
+}
 
 /** Send a relayed reply now if that network is connected. */
 function sendReplyNow(reply: QueuedReply): boolean {
-	const network = store.getters.findNetwork(reply.network);
-
-	if (!network || !network.status.connected) {
+	if (!networkUp(reply.network)) {
 		return false;
 	}
 
@@ -918,22 +970,41 @@ function sendReplyNow(reply: QueuedReply): boolean {
 	return true;
 }
 
+/** Set a relayed read marker now if that network is connected. Connected
+ * is enough: without `draft/read-marker` the IRC layer sends nothing, and
+ * nothing better could be done for that entry later either. */
+function markReadNow(mark: QueuedMarkRead): boolean {
+	if (!networkUp(mark.network)) {
+		return false;
+	}
+
+	socket.emit("markread", {network: mark.network, target: mark.target, time: mark.time});
+
+	return true;
+}
+
+/** Send one relayed or queued entry now; false while its network is down. */
+function sendEntryNow(entry: OutboxEntry): boolean {
+	return entry.type === "markread" ? markReadNow(entry) : sendReplyNow(entry);
+}
+
 /** Serialises outbox rewrites so a burst of connects cannot lose a reply. */
 let outboxChain: Promise<void> = Promise.resolve();
 
-/** Send what the worker queued for `network` (a reply typed while no page
- * could send it), now that the network is connected. */
+/** Send what the worker queued for `network` (a reply typed, or a Mark
+ * read tapped, while no page could send it), now that the network is
+ * connected. */
 function drainOutbox(network: string): void {
 	outboxChain = outboxChain
 		.then(async () => {
-			const queued = (await idbGet<QueuedReply[]>(OUTBOX_KEY)) ?? [];
+			const queued = (await idbGet<OutboxEntry[]>(OUTBOX_KEY)) ?? [];
 
 			if (!Array.isArray(queued) || queued.length === 0) {
 				return;
 			}
 
 			const rest = queued.filter(
-				(reply) => !(reply.network === network && sendReplyNow(reply))
+				(entry) => !(entry.network === network && sendEntryNow(entry))
 			);
 
 			if (rest.length !== queued.length) {
@@ -969,23 +1040,23 @@ if (browserSupported() && "serviceWorker" in navigator) {
 			return;
 		}
 
-		// A reply typed into a notification: send it over this page's own
-		// connection and tell the worker whether that worked (it falls back
-		// to its own connection, or queues the reply, otherwise).
-		if (event.data.type === "reply") {
-			const reply = event.data as QueuedReply;
+		// A reply typed into a notification, or its Mark read: send it over
+		// this page's own connection and tell the worker whether that worked
+		// (it falls back to its own connection, or queues the entry, otherwise).
+		if (event.data.type === "reply" || event.data.type === "markread") {
+			const entry = event.data as OutboxEntry;
 			const port = event.ports[0];
 			let ok = false;
 
 			try {
 				// Delivered late (this page was frozen): the worker has already
-				// sent or queued it — sending now would post the reply twice.
-				const stale = typeof reply.deadline === "number" && Date.now() > reply.deadline;
+				// sent or queued it — sending now would post a reply twice.
+				const stale = typeof entry.deadline === "number" && Date.now() > entry.deadline;
 
-				ok = !stale && sendReplyNow(reply);
+				ok = !stale && sendEntryNow(entry);
 			} catch (error) {
 				// eslint-disable-next-line no-console
-				console.warn("[webpush] relayed reply failed", error);
+				console.warn("[webpush] relayed message failed", error);
 			}
 
 			if (port) {

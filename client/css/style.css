@@ -425,6 +425,7 @@ p {
 .channel-list-item .connection-status-icon::before,
 .channel-list-item .notify-status-icon::before,
 .channel-list-item .edit-network::before,
+.channel-list-item .add-channel::before,
 .channel-list-item .parted-channel-icon::before,
 .jump-to-input::before,
 .password-container .reveal-password span,
@@ -886,13 +887,65 @@ background on hover (unless active) */
 	color: #84ce88;
 	font-size: 1.0625rem;
 	font-weight: bold;
-	padding-left: 0;
+	padding: 0.375rem 0.875rem 0.25rem 0;
 }
 
+/* The network header is two rows inside one tab — one click target, one drag
+handle, one hover — so the name reads at full width instead of sharing its line
+with four tools: `.lobby-title` is the chevron, the name and the unread badge;
+`.lobby-status` under it holds the tools (connection state, notifications,
+edit, join) on the left, starting where the channel rows' icons do, and the
+nick this connection uses on the right, ending where the badge does. The tools
+never shrink; a nick too long for what they leave it ends in an ellipsis. The
+wrapper is what the jump-to results' server glyph (::before) sits beside. */
 .channel-list-item .lobby-wrap {
 	display: flex;
+	flex-direction: column;
 	flex-grow: 1;
+	min-width: 0;
 	overflow: hidden;
+}
+
+.channel-list-item .lobby-title,
+.channel-list-item .lobby-status {
+	display: flex;
+	align-items: center;
+	min-width: 0;
+}
+
+.channel-list-item .lobby-status {
+	margin-top: 0.125rem;
+	padding-left: 0.875rem; /* the channel rows' own padding, so the toolbar sits on their icon column */
+	gap: 0.5rem;
+	font-size: 0.75rem;
+	font-weight: normal;
+}
+
+.channel-list-item .lobby-tools {
+	display: flex;
+	align-items: center;
+	flex-shrink: 0;
+	gap: 0.25rem;
+}
+
+.channel-list-item .lobby-nick {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	text-align: right;
+
+	/* A theme with a rail palette (coffee, creama) lends its muted rail text;
+	the fallback is day's sidebar #b7c5d1, stepped back. */
+	color: var(--rail-fg-muted, rgb(183 197 209 / 75%));
+}
+
+/* In the jump-to results a network is a destination, not a thing to operate
+on: the nick still tells the networks apart, the toolbar would only get in the
+way of the click. */
+.jump-to-results .channel-list-item .lobby-tools {
+	display: none;
 }
 
 .channel-list-item[data-type="lobby"]:hover,
@@ -1051,6 +1104,13 @@ the same counter the badge shows). Muted channels keep their faded look. */
 	opacity: 1;
 }
 
+/* Every tool on the status line is the same 1.5rem box with its glyph centred,
+so the block reads as one evenly spaced toolbar (a button centres its content
+by itself; the bell is a span and has to be told). Even boxes are not enough on
+their own: the eye measures the gaps between ink, so the four glyphs are all
+FontAwesome solids of about the same size and weight — the join tool used to
+be a thin text "+" and the bell a smaller, dimmer glyph, and the row looked
+unevenly spaced however evenly the boxes sat. */
 .channel-list-item[data-type="lobby"] .add-channel {
 	border-radius: 3px;
 	width: 1.5rem;
@@ -1060,12 +1120,11 @@ the same counter the badge shows). Muted channels keep their faded look. */
 }
 
 .channel-list-item[data-type="lobby"] .add-channel::before {
-	font-size: 1.25rem;
-	font-weight: normal;
+	content: "\f067"; /* https://fontawesome.com/icons/plus?style=solid */
+	font-size: 0.875rem;
 	display: inline-block;
 	line-height: 1.5rem;
 	text-align: center;
-	content: "+";
 	color: #fff;
 }
 
@@ -1082,7 +1141,6 @@ the same counter the badge shows). Muted channels keep their faded look. */
 	border-radius: 3px;
 	width: 1.5rem;
 	height: 1.5rem;
-	margin-right: 4px;
 	opacity: 0.4;
 	transition: opacity 0.2s, background-color 0.2s;
 }
@@ -1103,7 +1161,6 @@ the same counter the badge shows). Muted channels keep their faded look. */
 .channel-list-item .connection-status-tooltip {
 	flex-shrink: 0;
 	line-height: 1;
-	margin: 0 4px;
 }
 
 .channel-list-item .connection-status-icon {
@@ -1114,7 +1171,7 @@ the same counter the badge shows). Muted channels keep their faded look. */
 }
 
 .channel-list-item .connection-status-icon::before {
-	font-size: 0.875rem;
+	font-size: 0.8125rem; /* the link glyph is wide: one step under the others keeps its ink the same width */
 	display: inline-block;
 	line-height: 1.5rem;
 	text-align: center;
@@ -1132,13 +1189,13 @@ the same counter the badge shows). Muted channels keep their faded look. */
 .channel-list-item .notify-tooltip {
 	flex-shrink: 0;
 	line-height: 1;
-	margin: 0 4px;
 }
 
 .channel-list-item .notify-status-icon {
 	display: inline-block;
 	width: 1.5rem;
 	height: 1.5rem;
+	text-align: center;
 	opacity: 0.7;
 	transition: opacity 0.2s;
 }
@@ -1148,9 +1205,8 @@ the same counter the badge shows). Muted channels keep their faded look. */
 }
 
 .channel-list-item .notify-status-icon::before {
-	font-size: 0.8125rem;
+	font-size: 0.875rem;
 	line-height: 1.5rem;
-	text-align: center;
 }
 
 .channel-list-item .notify-status-icon.on::before {
@@ -1158,16 +1214,23 @@ the same counter the badge shows). Muted channels keep their faded look. */
 	color: #2ea043;
 }
 
+/* Not subscribed: the same white-at-0.4 as the gear and the plus beside it,
+so the toolbar has one weight; green is what marks a subscribed bell. */
+.channel-list-item .notify-status-icon.enabled,
+.channel-list-item .notify-status-icon.off {
+	opacity: 0.4;
+}
+
 .channel-list-item .notify-status-icon.enabled::before {
 	content: "\f0f3"; /* bell: notifications on, not subscribed (the font is
 	                    FA5 solid-only, so no outline variant exists — the
-	                    muted colour is what separates this from on) */
-	color: var(--body-color-muted);
+	                    colour is what separates this from on) */
+	color: #fff;
 }
 
 .channel-list-item .notify-status-icon.off::before {
 	content: "\f1f6"; /* bell-slash: notifications off */
-	color: var(--body-color-muted);
+	color: #fff;
 }
 
 .channel-list-item .connection-status-icon.is-connected::before {
@@ -1519,6 +1582,7 @@ textarea.input {
 	flex-grow: 1;
 	overflow: hidden;
 	position: relative;
+	transition: opacity 0.3s ease; /* #chat.disconnected, below */
 }
 
 #chat .chat {
@@ -1800,6 +1864,18 @@ textarea.input {
  * §1.9): faded rather than recoloured, so it reads the same on every theme,
  * and back to normal — as a new row — once the echo replaces it. */
 #chat .msg.pending {
+	opacity: 0.55;
+}
+
+/* A conversation on a network that is down fades the same way until the
+ * network registers again (Chat.vue `isDisconnected`), and so do the sidebar
+ * rows of that network's channels and queries (ChannelWrapper.vue
+ * `network-down`; the lobby row goes red instead). */
+#chat.disconnected .chat-content {
+	opacity: 0.55;
+}
+
+.channel-list-item.network-down {
 	opacity: 0.55;
 }
 
@@ -2961,6 +3037,16 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	flex: 1 0 auto;
 	align-self: center;
 	touch-action: pan-y;
+	caret-color: var(--link-color);
+}
+
+/* The composer shows that it holds the caret — ChatInput.vue puts it there
+   when a conversation opens, and a caret alone is a thin blinking line in the
+   text colour that is easy to miss: while anything in the form has focus its
+   top edge takes the input focus colour (the caret above takes the accent). */
+#form:focus-within {
+	border-top-color: #84ce88;
+	box-shadow: inset 0 2px 0 rgb(132 206 136 / 50%);
 }
 
 #form #upload-input {
@@ -4661,6 +4747,81 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	to {
 		left: 100%;
 	}
+}
+
+/* The network behind this conversation is down: a row of its own above the
+ * input, like .compose-bar, saying what it is doing (ChatInput.vue
+ * `showConnectionBar`) — a turning sync glyph while a dial or a retry is
+ * under way, a Connect button when nothing is being tried. Gone with the
+ * registration. */
+#form .connection-bar {
+	flex: 1 0 100%;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+	margin: 0 4px 2px;
+	padding: 2px 6px;
+	border-left: 2px solid var(--body-color-muted);
+	background: rgb(0 0 0 / 4%);
+	border-radius: 0 3px 3px 0;
+	color: var(--body-color-muted);
+	font-size: 0.875rem;
+	line-height: 1.5;
+}
+
+#form .connection-bar-label {
+	flex: 1 1 auto;
+	min-width: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+#form .connection-bar-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1rem;
+	flex-shrink: 0;
+}
+
+#form .connection-bar-icon::before {
+	content: "\f127"; /* https://fontawesome.com/icons/unlink?style=solid */
+	display: inline-block;
+	font: normal normal normal 0.9em/1 FontAwesome;
+}
+
+#form .connection-bar-icon.spinning::before {
+	content: "\f021"; /* https://fontawesome.com/icons/sync?style=solid */
+	animation: connection-status-spin 1.5s linear infinite;
+}
+
+/* Keep the cue, drop the motion */
+@media (prefers-reduced-motion: reduce) {
+	#form .connection-bar-icon.spinning::before {
+		animation: none;
+	}
+}
+
+#form .connection-bar-connect {
+	flex: 0 0 auto;
+	height: 1.5rem;
+	padding: 0 8px;
+	border: 0;
+	border-radius: 3px;
+	background: rgb(0 0 0 / 8%);
+	color: var(--body-color);
+	font: inherit;
+	font-size: 0.8125rem;
+	line-height: 1.5rem;
+	cursor: pointer;
+}
+
+#form .connection-bar-connect:hover,
+#form .connection-bar-connect:focus-visible {
+	background: rgb(0 0 0 / 14%);
+	outline: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

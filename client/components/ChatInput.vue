@@ -1,6 +1,24 @@
 <template>
 	<form id="form" method="post" action="" @submit.prevent="onSubmit">
 		<TypingIndicator :channel="channel" />
+		<div v-if="showConnectionBar" class="connection-bar" role="status" aria-live="polite">
+			<span
+				:class="[
+					'connection-bar-icon',
+					{spinning: network.status.connecting && retryInSeconds === 0},
+				]"
+				aria-hidden="true"
+			></span>
+			<span class="connection-bar-label">{{ connectionLabel }}</span>
+			<button
+				v-if="canConnectNow"
+				type="button"
+				class="connection-bar-connect"
+				@click="connectNetwork"
+			>
+				{{ network.status.connecting ? "Connect now" : "Connect" }}
+			</button>
+		</div>
 		<div
 			v-if="store.state.uploadProgress"
 			class="upload-bar"
@@ -94,9 +112,9 @@
 		<span
 			id="submit-tooltip"
 			class="tooltipped tooltipped-w tooltipped-no-touch"
-			data-tooltip="Send message"
+			:data-tooltip="canSend ? 'Send message' : 'Not connected'"
 		>
-			<button id="submit" type="submit" aria-label="Send message" />
+			<button id="submit" type="submit" aria-label="Send message" :disabled="!canSend" />
 		</span>
 	</form>
 </template>
@@ -225,6 +243,88 @@ export default defineComponent({
 			return "";
 		};
 
+		// A conversation (channel or query) on a network that is down: the
+		// draft can be typed but not sent — only a slash command goes, so
+		// `/connect` and friends still work from here — and a strip above the
+		// input says what the network is doing. The lobby is left alone: its
+		// input is for commands, and it is where the connection reports.
+		const isConversation = computed(
+			() => props.channel.type === ChanType.CHANNEL || props.channel.type === ChanType.QUERY
+		);
+
+		const showConnectionBar = computed(
+			() => isConversation.value && !props.network.status.connected
+		);
+
+		const canSend = computed(
+			() =>
+				props.network.status.connected ||
+				!isConversation.value ||
+				props.channel.pendingMessage.startsWith("/")
+		);
+
+		// The wait before the transport's next retry (`status.retryAt`) counts
+		// down here — a tick every half second while the strip shows — and
+		// "Connect now" skips it (`/connect` restarts the schedule).
+		const now = ref(Date.now());
+		let ticker: ReturnType<typeof setInterval> | null = null;
+
+		const retryInSeconds = computed(() => {
+			const at = props.network.status.retryAt;
+
+			if (!props.network.status.connecting || at === undefined) {
+				return 0;
+			}
+
+			return Math.max(0, Math.ceil((at - now.value) / 1000));
+		});
+
+		const connectionLabel = computed(() => {
+			const name = props.network.name || "the network";
+
+			if (!props.network.status.connecting) {
+				return `Disconnected from ${name}.`;
+			}
+
+			return retryInSeconds.value > 0
+				? `Reconnecting to ${name} in ${retryInSeconds.value}s…`
+				: `Connecting to ${name}…`;
+		});
+
+		// Idle, or waiting for a retry: a dial in flight offers nothing.
+		const canConnectNow = computed(
+			() => !props.network.status.connecting || retryInSeconds.value > 0
+		);
+
+		watch(
+			showConnectionBar,
+			(shown) => {
+				if (shown && ticker === null) {
+					now.value = Date.now();
+					ticker = setInterval(() => {
+						now.value = Date.now();
+					}, 500);
+				} else if (!shown && ticker !== null) {
+					clearInterval(ticker);
+					ticker = null;
+				}
+			},
+			{immediate: true}
+		);
+
+		watch(
+			() => props.network.status.retryAt,
+			() => {
+				now.value = Date.now();
+			}
+		);
+
+		// The same `/connect` the sidebar's status icon sends; any window of
+		// the network routes to its client.
+		const connectNetwork = () => {
+			socket.emit("input", {target: props.channel.id, text: "/connect"});
+		};
+
 		// Reply/edit compose bar (channel.replyTo / channel.editing).
 		const composeTarget = computed(() => props.channel.editing || props.channel.replyTo);
 
@@ -246,12 +346,14 @@ export default defineComponent({
 			input.value.focus();
 
 			// No global gate: `/connect` and friends must work from a
-			// disconnected network; plain text gets a proper error from
-			// the IRC layer (NOT_CONNECTED_TEXT).
+			// disconnected network. Plain text in a conversation on a
+			// network that is down stays as the draft (`canSend`, the same
+			// rule that disables the send button); elsewhere the IRC layer
+			// answers it with NOT_CONNECTED_TEXT.
 			const target = props.channel.id;
 			const text = props.channel.pendingMessage;
 
-			if (text.length === 0) {
+			if (text.length === 0 || !canSend.value) {
 				return false;
 			}
 
@@ -435,6 +537,9 @@ export default defineComponent({
 
 		onMounted(() => {
 			eventbus.on("escapekey", blurInput);
+			// A click on the sidebar row of the conversation already open
+			// (ChannelWrapper.vue): no route change, still "let me type".
+			eventbus.on("input:focus", focusForTyping);
 			focusForTyping();
 
 			if (store.state.settings.autocomplete) {
@@ -613,7 +718,13 @@ export default defineComponent({
 		});
 
 		onUnmounted(() => {
+			if (ticker !== null) {
+				clearInterval(ticker);
+				ticker = null;
+			}
+
 			eventbus.off("escapekey", blurInput);
+			eventbus.off("input:focus", focusForTyping);
 
 			if (autocompletionRef.value) {
 				autocompletionRef.value.destroy();
@@ -645,6 +756,12 @@ export default defineComponent({
 			cancelCompose,
 			composeNick,
 			composePreview,
+			showConnectionBar,
+			canSend,
+			connectionLabel,
+			retryInSeconds,
+			canConnectNow,
+			connectNetwork,
 		};
 	},
 });

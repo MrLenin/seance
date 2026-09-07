@@ -21,7 +21,7 @@ export type MergedMessage = {
 	/** Raw text as pushed (joined for a batch); stripped only when rendered. */
 	text: string;
 	msgid?: string;
-	/** Multiline: the batch reference and its lines by 1-based index. */
+	/** Multiline: the batch reference (its `batch` tag, the base msgid) and its lines by 1-based index. */
 	batch?: string;
 	lines?: Record<string, MergedLine>;
 	sent?: number;
@@ -31,7 +31,9 @@ export type MergedMessage = {
 export type IncomingMessage = {
 	from: string;
 	text: string;
+	/** Absent on the later lines of a multiline message. */
 	msgid?: string;
+	/** Multiline: the `batch` tag every line of the message carries. */
 	batch?: string;
 	line?: LineIndex;
 	concat?: boolean;

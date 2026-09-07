@@ -7,6 +7,7 @@
 				'time-seconds': store.state.settings.showSeconds,
 				'time-12h': store.state.settings.use12hClock,
 				'colored-nicks': true, // TODO temporarily fixes themes, to be removed in next major version
+				disconnected: isDisconnected,
 			}"
 		>
 			<div
@@ -185,6 +186,15 @@ export default defineComponent({
 			props.network.name ? `Connecting to ${props.network.name}…` : "Connecting…"
 		);
 
+		// A conversation whose network is down is faded (like a pending
+		// message) until it registers again; the lobby reads as usual, it is
+		// where the connection reports.
+		const isDisconnected = computed(
+			() =>
+				!props.network.status.connected &&
+				(props.channel.type === ChanType.CHANNEL || props.channel.type === ChanType.QUERY)
+		);
+
 		const specialComponent = computed(() => {
 			switch (props.channel.special) {
 				case SpecialChanType.BANLIST:
@@ -296,6 +306,7 @@ export default defineComponent({
 			topicInput,
 			plainTopic,
 			connectingLabel,
+			isDisconnected,
 			specialComponent,
 			hideUserVisibleError,
 			editTopic,
