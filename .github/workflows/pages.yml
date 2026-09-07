@@ -1,5 +1,15 @@
-# Build the static client and publish it to GitHub Pages when a release is
-# published: https://evilnet.github.io/seance/ serves the latest release.
+# Build the static client and publish it to GitHub Pages.
+#
+# Upstream (evilnet/seance) publishes on a release only, so
+# https://evilnet.github.io/seance/ always serves the latest release. A fork
+# has its own, independent Pages site that upstream never touches, and for a
+# fork the useful trigger is a push to develop — so the push trigger below is
+# live everywhere except upstream. `workflow_dispatch` works anywhere.
+#
+# Only one thing can be published: with the "GitHub Actions" Pages source a
+# deployment is the whole site, so a second target (a /dev/ subpath, a PR
+# preview) is not possible without moving to a gh-pages branch.
+#
 # The SPA uses relative asset paths and a hash router, so it works under the
 # /seance/ subpath unchanged. Pages is HTTPS, so from there only wss://
 # servers are reachable (mixed content blocks ws://).
@@ -8,6 +18,10 @@ name: Pages
 on:
   release:
     types: [published]
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -20,11 +34,16 @@ concurrency:
 
 jobs:
   build:
+    # Upstream deploys releases; forks also deploy their develop.
+    if: github.event_name != 'push' || github.repository != 'evilnet/seance'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.ref }}
+          # Tags and history, so that a build without SEANCE_VERSION can name
+          # itself `<latest tag>-<short sha>` (webpack.config.ts resolveVersion).
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -41,7 +60,7 @@ jobs:
         run: yarn build
         env:
           NODE_ENV: production
-          SEANCE_VERSION: ${{ github.event.release.tag_name }}
+          SEANCE_VERSION: ${{ github.event_name == 'release' && github.event.release.tag_name || '' }}
 
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
