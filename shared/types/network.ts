@@ -26,6 +26,12 @@ export type SharedNetworkStatus = {
 	/** A connection attempt is under way (including the wait before a retry). */
 	connecting: boolean;
 	secure: boolean;
+	/**
+	 * When the next automatic dial is due (epoch ms), while `connecting` is
+	 * the wait before a retry; absent while a dial is in flight, when
+	 * connected, and when nothing is being tried. The UI counts it down.
+	 */
+	retryAt?: number;
 };
 
 export type SharedNetwork = {

@@ -894,6 +894,45 @@ describe("IrcClient", function () {
 			).to.equal(true);
 		});
 
+		it("says when the retry is due (retryAt) and drops it once the dial starts", function () {
+			// The transport's close carries the wait before its retry; the
+			// UI counts it down (the strip above the input) and offers a
+			// "Connect now". A dial in progress has no due time.
+			const clock = sinon.useFakeTimers({now: 1_700_000_000_000, toFake: ["Date"]});
+
+			try {
+				const h = setup();
+				joined(h);
+				h.transport.closed(1006, "", true); // the fake retries 1000 ms later
+
+				expect(payloads("network:status").slice(-1)).to.deep.equal([
+					{
+						network: h.client.uuid,
+						connected: false,
+						connecting: true,
+						secure: true,
+						retryAt: Date.now() + 1000,
+					},
+				]);
+				expect(h.client.network.status.retryAt).to.equal(Date.now() + 1000);
+
+				h.transport.retry(1);
+
+				expect(payloads("network:status").slice(-1)).to.deep.equal([
+					{network: h.client.uuid, connected: false, connecting: true, secure: true},
+				]);
+				expect(h.client.network.status).to.not.have.property("retryAt");
+
+				// Registering again reports connected, without a due time.
+				register(h);
+				expect(payloads("network:status").slice(-1)).to.deep.equal([
+					{network: h.client.uuid, connected: true, connecting: false, secure: true},
+				]);
+			} finally {
+				clock.restore();
+			}
+		});
+
 		it("marks everything parted on an unclean close and re-joins after re-registering", function () {
 			const h = setup();
 			const id = joined(h);
@@ -905,9 +944,12 @@ describe("IrcClient", function () {
 			const kept = h.client.findChannel("#kept")!;
 			h.transport.closed(1006, "", true);
 
-			expect(payloads("network:status").slice(-1)).to.deep.equal([
-				{network: h.client.uuid, connected: false, connecting: true, secure: true},
-			]);
+			expect(payloads("network:status").slice(-1)[0]).to.include({
+				network: h.client.uuid,
+				connected: false,
+				connecting: true,
+				secure: true,
+			});
 			expect(h.client.isConnected).to.equal(false);
 			expect(h.client.state).to.equal("connecting");
 			expect(h.client.network.status.connecting).to.equal(true);
@@ -950,11 +992,12 @@ describe("IrcClient", function () {
 			joined(h);
 			h.transport.closed(1006, "", true);
 			expect(h.client.state).to.equal("connecting");
-			expect(h.client.network.status).to.deep.equal({
+			expect(h.client.network.status).to.include({
 				connected: false,
 				connecting: true,
 				secure: true,
 			});
+			expect(h.client.network.status.retryAt).to.be.a("number");
 
 			h.client.disconnect();
 

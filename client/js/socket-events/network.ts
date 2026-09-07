@@ -93,6 +93,13 @@ socket.on("network:status", function (data) {
 	network.status.connecting = data.connecting;
 	network.status.secure = data.secure;
 
+	// Only while a retry is pending; the key goes with the wait.
+	if (data.retryAt !== undefined) {
+		network.status.retryAt = data.retryAt;
+	} else {
+		delete network.status.retryAt;
+	}
+
 	// A private conversation to reopen now that we are registered: the one
 	// a notification deep link names, or the one the last page had open.
 	// Channels arrive with the join burst, a query window only when opened —

@@ -71,6 +71,8 @@ interface ServerToClientEvents {
 		connected: boolean;
 		connecting: boolean;
 		secure: boolean;
+		/** Epoch ms of the next automatic dial, only while waiting for a retry. */
+		retryAt?: number;
 	}>;
 	"network:info": EventHandler<{uuid: string}>;
 	"network:name": EventHandler<{uuid: string; name: string}>;

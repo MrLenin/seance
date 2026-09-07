@@ -19,7 +19,11 @@ import {brandingFeatures} from "../branding";
 import {createHighlightTester} from "../highlight";
 import {ChanState, ChanType} from "../../../shared/types/chan";
 import {MessageType, SharedMsg, TypingState} from "../../../shared/types/msg";
-import type {SharedNetwork, SharedServerOptions} from "../../../shared/types/network";
+import type {
+	SharedNetwork,
+	SharedNetworkStatus,
+	SharedServerOptions,
+} from "../../../shared/types/network";
 import type {PushSession} from "../../../shared/types/socket-events";
 import {CapNegotiator, SEANCE_CAPS, webpushVapidOf, WEBPUSH_CAP} from "./caps";
 import {casefold, namesEqual} from "./casemap";
@@ -272,6 +276,8 @@ export class IrcClient {
 	private closeHintShown = false;
 	/** The close about to arrive is ours and the lobby already says why (transport.abandon). */
 	private closeExplained = false;
+	/** When the transport's next automatic dial is due; only while waiting for a retry. */
+	private retryAt: number | undefined;
 	private activeChanId = 0;
 	/** Set while a history batch is replayed through the handlers (see `collectReplay`). */
 	private replayContext: {target: Channel; collected: ReplayCollection} | null = null;
@@ -343,6 +349,21 @@ export class IrcClient {
 		};
 	}
 
+	/** The connection state as the UI sees it; `retryAt` only while a retry is pending. */
+	private get status(): SharedNetworkStatus {
+		return {
+			connected: this.connected,
+			connecting: this._state === "connecting" || this._state === "registering",
+			secure: this.options.tls,
+			...(this.retryAt !== undefined ? {retryAt: this.retryAt} : {}),
+		};
+	}
+
+	/** `network:status` for the current state. */
+	private announceStatus(): void {
+		this.bus.dispatch("network:status", {network: this.uuid, ...this.status});
+	}
+
 	/** The `SharedNetwork` snapshot the UI is given (channels carry no messages). */
 	get network(): SharedNetwork {
 		return {
@@ -350,11 +371,7 @@ export class IrcClient {
 			name: this.networkName,
 			nick: this.nick,
 			serverOptions: this.serverOptions,
-			status: {
-				connected: this.connected,
-				connecting: this._state === "connecting" || this._state === "registering",
-				secure: this.options.tls,
-			},
+			status: this.status,
 			channels: this.channels.map((chan) => chan.snapshot()),
 		};
 	}
@@ -405,14 +422,10 @@ export class IrcClient {
 		this.applyStsPolicy();
 		this.quitting = false;
 		this.closeHintShown = false;
+		this.retryAt = undefined;
 		this._state = "connecting";
 		this.bus.dispatch("connecting");
-		this.bus.dispatch("network:status", {
-			network: this.uuid,
-			connected: false,
-			connecting: true,
-			secure: this.options.tls,
-		});
+		this.announceStatus();
 		this.pushMessage(
 			this.lobby,
 			{text: `Connecting to ${this.options.host}:${this.options.port}…`},
@@ -434,16 +447,12 @@ export class IrcClient {
 		}
 
 		this.transport.close();
+		this.retryAt = undefined;
 
 		if (state === "reconnect-wait") {
 			// The socket is already gone, so no close event follows: settle here.
 			this._state = "disconnected";
-			this.bus.dispatch("network:status", {
-				network: this.uuid,
-				connected: false,
-				connecting: false,
-				secure: this.options.tls,
-			});
+			this.announceStatus();
 			this.pushMessage(this.lobby, {text: "Reconnect cancelled."}, true);
 		}
 	}
@@ -618,7 +627,7 @@ export class IrcClient {
 				this.handleLine(ev.line);
 				break;
 			case "close":
-				this.onClose(ev.code, ev.reason, ev.willReconnect);
+				this.onClose(ev.code, ev.reason, ev.willReconnect, ev.delayMs);
 				break;
 			case "reconnecting":
 				this._state = "connecting";
@@ -638,8 +647,10 @@ export class IrcClient {
 				);
 				break;
 			case "retry":
-				// The scheduled retry is dialling now.
+				// The scheduled retry is dialling now: no due time any more.
 				this._state = "connecting";
+				this.retryAt = undefined;
+				this.announceStatus();
 				this.pushMessage(
 					this.lobby,
 					{
@@ -659,6 +670,7 @@ export class IrcClient {
 	private onOpen(): void {
 		this._state = "registering";
 		this.connected = false;
+		this.retryAt = undefined;
 		this.closeHintShown = false;
 		this.isupport.reset();
 		this.motdBuffer = null;
@@ -932,11 +944,17 @@ export class IrcClient {
 		this.sasl = null;
 	}
 
-	private onClose(code: number, reason: string, willReconnect: boolean): void {
+	private onClose(code: number, reason: string, willReconnect: boolean, delayMs?: number): void {
 		const phase = this._state;
 		const wasUp = phase !== "disconnected";
 		this._state = "disconnected";
 		this.connected = false;
+		// The wait before the transport's retry, for the UI to count down;
+		// an immediate retry has nothing worth counting.
+		this.retryAt =
+			willReconnect && delayMs !== undefined && delayMs > 0
+				? Date.now() + delayMs
+				: undefined;
 		this.stsUpgradeTried = false;
 		this.endSasl();
 
@@ -974,6 +992,7 @@ export class IrcClient {
 			connected: false,
 			connecting: willReconnect,
 			secure: this.options.tls,
+			...(this.retryAt !== undefined ? {retryAt: this.retryAt} : {}),
 		});
 
 		if (wasUp) {

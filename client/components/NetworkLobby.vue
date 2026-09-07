@@ -25,7 +25,7 @@
 				<div class="lobby-tools">
 					<span
 						:aria-label="statusLabel"
-						class="connection-status-tooltip tooltipped tooltipped-w"
+						class="connection-status-tooltip tooltipped tooltipped-e"
 					>
 						<button
 							:class="['connection-status-icon', statusClass]"
@@ -42,7 +42,7 @@
 					</span>
 					<span
 						aria-label="Edit this network…"
-						class="edit-network-tooltip tooltipped tooltipped-w tooltipped-no-touch"
+						class="edit-network-tooltip tooltipped tooltipped-e tooltipped-no-touch"
 					>
 						<button
 							class="edit-network"
@@ -52,7 +52,7 @@
 					</span>
 					<span
 						:aria-label="joinChannelLabel"
-						class="add-channel-tooltip tooltipped tooltipped-w tooltipped-no-touch"
+						class="add-channel-tooltip tooltipped tooltipped-e tooltipped-no-touch"
 					>
 						<button
 							:class="['add-channel', {opened: isJoinChannelShown}]"
