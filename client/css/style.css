@@ -930,6 +930,7 @@ wrapper is what the jump-to results' server glyph (::before) sits beside. */
 	white-space: nowrap;
 	text-overflow: ellipsis;
 	text-align: right;
+
 	/* A theme with a rail palette (coffee, creama) lends its muted rail text;
 	the fallback is day's sidebar #b7c5d1, stepped back. */
 	color: var(--rail-fg-muted, rgb(183 197 209 / 75%));
