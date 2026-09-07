@@ -167,6 +167,50 @@ export default async function run(page) {
 		ink.every((g) => /FontAwesome/.test(g.family))
 	);
 
+	// Every tooltip in the sidebar must open on screen. The tools sit at the
+	// sidebar's left edge now, so a west-pointing tooltip (primer-tooltips:
+	// right: 100% of its element) would hang past x = 0. The tooltip is an
+	// ::after that is display: none until its element is hovered, so hover
+	// each one with real mouse events, then read the resolved width and place
+	// it by the direction class. Elements that are not shown (a channel's
+	// Leave button off the active row) are skipped.
+	const TOOLTIPPED = "#sidebar .tooltipped";
+	const tooltipCount = await page.count(TOOLTIPPED);
+	const viewportWidth = await page.evaluate("window.innerWidth");
+
+	for (let i = 0; i < tooltipCount; i++) {
+		const host = await page.rect(TOOLTIPPED, i);
+
+		if (!host || host.width === 0) {
+			continue;
+		}
+
+		await page.hover(TOOLTIPPED, i);
+		const t = await page.evaluate(`(() => {
+			const el = document.querySelectorAll(${JSON.stringify(TOOLTIPPED)})[${i}];
+			const r = el.getBoundingClientRect();
+			const w = parseFloat(getComputedStyle(el, "::after").width) || 0;
+			const gap = 6;
+			const dir = [...el.classList].find((c) => /^tooltipped-(n|s|e|w|ne|nw|se|sw)$/.test(c)) ?? "tooltipped-n";
+			let left;
+			if (dir === "tooltipped-w") left = r.left - gap - w;
+			else if (dir === "tooltipped-e") left = r.right + gap;
+			else if (dir === "tooltipped-ne" || dir === "tooltipped-se") left = r.left;
+			else if (dir === "tooltipped-nw" || dir === "tooltipped-sw") left = r.right - w;
+			else left = r.left + r.width / 2 - w / 2;
+			return {label: el.getAttribute("aria-label") ?? el.dataset.tooltip ?? "?", dir, left: Math.round(left), right: Math.round(left + w), width: Math.round(w)};
+		})()`);
+		page.check(`tooltip "${t.label}" renders on hover`, t.width > 0);
+		page.check(
+			`tooltip "${t.label}" (${t.dir}) opens on screen (x ${t.left}..${t.right})`,
+			t.left >= 0 && t.right <= viewportWidth
+		);
+	}
+
+	await page.hover(`${LOBBY} .edit-network-tooltip`);
+	await page.sleep(700); // primer-tooltips fades the tooltip in after a delay
+	await page.screenshot("0-tooltip-on-the-gear", {selector: "#sidebar"});
+
 	page.check("name is not clipped", await unclipped(`${LOBBY} .lobby-title .name`));
 	page.check("an ordinary nick is not clipped", await unclipped(`${LOBBY} .lobby-nick`));
 	const shownName = await page.evaluate(text(`${LOBBY} .lobby-title .name`));
