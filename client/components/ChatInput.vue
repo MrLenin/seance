@@ -1,6 +1,21 @@
 <template>
 	<form id="form" method="post" action="" @submit.prevent="onSubmit">
 		<TypingIndicator :channel="channel" />
+		<div v-if="showConnectionBar" class="connection-bar" role="status" aria-live="polite">
+			<span
+				:class="['connection-bar-icon', {spinning: network.status.connecting}]"
+				aria-hidden="true"
+			></span>
+			<span class="connection-bar-label">{{ connectionLabel }}</span>
+			<button
+				v-if="!network.status.connecting"
+				type="button"
+				class="connection-bar-connect"
+				@click="connectNetwork"
+			>
+				Connect
+			</button>
+		</div>
 		<div
 			v-if="store.state.uploadProgress"
 			class="upload-bar"
@@ -94,9 +109,9 @@
 		<span
 			id="submit-tooltip"
 			class="tooltipped tooltipped-w tooltipped-no-touch"
-			data-tooltip="Send message"
+			:data-tooltip="canSend ? 'Send message' : 'Not connected'"
 		>
-			<button id="submit" type="submit" aria-label="Send message" />
+			<button id="submit" type="submit" aria-label="Send message" :disabled="!canSend" />
 		</span>
 	</form>
 </template>
@@ -225,6 +240,40 @@ export default defineComponent({
 			return "";
 		};
 
+		// A conversation (channel or query) on a network that is down: the
+		// draft can be typed but not sent — only a slash command goes, so
+		// `/connect` and friends still work from here — and a strip above the
+		// input says what the network is doing. The lobby is left alone: its
+		// input is for commands, and it is where the connection reports.
+		const isConversation = computed(
+			() => props.channel.type === ChanType.CHANNEL || props.channel.type === ChanType.QUERY
+		);
+
+		const showConnectionBar = computed(
+			() => isConversation.value && !props.network.status.connected
+		);
+
+		const canSend = computed(
+			() =>
+				props.network.status.connected ||
+				!isConversation.value ||
+				props.channel.pendingMessage.startsWith("/")
+		);
+
+		const connectionLabel = computed(() => {
+			const name = props.network.name || "the network";
+
+			return props.network.status.connecting
+				? `Connecting to ${name}…`
+				: `Disconnected from ${name}.`;
+		});
+
+		// The same `/connect` the sidebar's status icon sends; any window of
+		// the network routes to its client.
+		const connectNetwork = () => {
+			socket.emit("input", {target: props.channel.id, text: "/connect"});
+		};
+
 		// Reply/edit compose bar (channel.replyTo / channel.editing).
 		const composeTarget = computed(() => props.channel.editing || props.channel.replyTo);
 
@@ -246,12 +295,14 @@ export default defineComponent({
 			input.value.focus();
 
 			// No global gate: `/connect` and friends must work from a
-			// disconnected network; plain text gets a proper error from
-			// the IRC layer (NOT_CONNECTED_TEXT).
+			// disconnected network. Plain text in a conversation on a
+			// network that is down stays as the draft (`canSend`, the same
+			// rule that disables the send button); elsewhere the IRC layer
+			// answers it with NOT_CONNECTED_TEXT.
 			const target = props.channel.id;
 			const text = props.channel.pendingMessage;
 
-			if (text.length === 0) {
+			if (text.length === 0 || !canSend.value) {
 				return false;
 			}
 
@@ -645,6 +696,10 @@ export default defineComponent({
 			cancelCompose,
 			composeNick,
 			composePreview,
+			showConnectionBar,
+			canSend,
+			connectionLabel,
+			connectNetwork,
 		};
 	},
 });

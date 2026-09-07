@@ -22,7 +22,7 @@
 //   5. once dials go through again the network registers on the next retry;
 //   6. no console errors.
 
-import net from "node:net";
+import {startProxy} from "./lib/irc-proxy.mjs";
 
 const HOST = process.env.SEANCE_URL ?? "http://127.0.0.1:8001";
 const IRC = {host: "127.0.0.1", port: 8067};
@@ -35,42 +35,6 @@ export const url = `${HOST}/?host=127.0.0.1&port=${PROXY_PORT}&tls=false&nick=${
 
 const LOBBY = ".channel-list-item[data-type='lobby']";
 const LINES = `Array.from(document.querySelectorAll("#chat .msg")).map((m) => m.textContent.trim())`;
-
-const pairs = new Set();
-let accepting = true;
-
-const proxy = net.createServer((socket) => {
-	if (!accepting) {
-		socket.destroy(); // the dial reaches nobody: a fast 1006 in the page
-		return;
-	}
-
-	const backend = net.connect(IRC.port, IRC.host);
-	const pair = {socket, backend};
-	const gone = () => {
-		pairs.delete(pair);
-		socket.destroy();
-		backend.destroy();
-	};
-
-	pairs.add(pair);
-	socket.pipe(backend);
-	backend.pipe(socket);
-	socket.on("close", gone);
-	backend.on("close", gone);
-	socket.on("error", gone);
-	backend.on("error", gone);
-});
-
-/** Drop every proxied connection without a word, like a radio going away. */
-function cut() {
-	for (const pair of pairs) {
-		pair.socket.destroy();
-		pair.backend.destroy();
-	}
-
-	pairs.clear();
-}
 
 /** The last "Reconnecting in Ns (attempt M)…" line the lobby shows, parsed. */
 function lastWait(lines) {
@@ -103,17 +67,17 @@ async function until(page, fn, timeout, label) {
 }
 
 export default async function run(page) {
-	await new Promise((resolve) => proxy.listen(PROXY_PORT, "127.0.0.1", resolve));
+	const proxy = startProxy({port: PROXY_PORT, target: IRC});
+	await proxy.listen();
 
 	try {
-		await check(page);
+		await check(page, proxy);
 	} finally {
-		cut();
 		proxy.close();
 	}
 }
 
-async function check(page) {
+async function check(page, proxy) {
 	// 1. Connect through the proxy: the URL prefills the form, an unknown
 	// server asks before connecting.
 	await page.goto(page.url, {waitForSelector: "#connect form"});
@@ -129,9 +93,9 @@ async function check(page) {
 
 	// 2. The radio goes away: the socket is cut and every dial is refused
 	// (those failed dials are the point, not a finding).
-	accepting = false;
+	proxy.refuse();
 	page.expectWsErrors = true;
-	cut();
+	proxy.cut();
 	await page.sleep(AWAY_MS);
 	let lines = await page.evaluate(LINES);
 	const before = lastWait(lines);
@@ -164,7 +128,7 @@ async function check(page) {
 	await page.screenshot("3-poked");
 
 	// 5. The radio is back: the next retry gets through.
-	accepting = true;
+	proxy.accept();
 	page.expectWsErrors = false;
 	const frames = page.wsFrames.length;
 	await until(page, () => registered(page, frames), 10000, "the re-registration");

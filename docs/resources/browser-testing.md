@@ -118,6 +118,12 @@ export default async function run(page) {
 | `send(method, params)`                     | raw CDP, for anything not wrapped                                                      |
 | `expectWsErrors`                           | set true while dials are refused on purpose (a failed dial is otherwise a failure)     |
 
+To take the connection away from under the page — a phone's radio going off —
+connect through `tools/scenarios/lib/irc-proxy.mjs`: `startProxy({port, target})`
+gives `cut()` (drop every proxied socket without a word), `refuse()` /
+`accept()` (every new dial dropped at once, or let through) and `close()`.
+`reconnect-after-backoff.mjs` and `disconnected-channel.mjs` are built on it.
+
 ### Rules that keep a scenario honest
 
 1. **Use `click`, never `evaluate("el.click()")`.** It dispatches real pointer

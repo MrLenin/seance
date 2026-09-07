@@ -11,6 +11,7 @@
 			{'has-unread': channel.unread},
 			{'has-highlight': channel.highlight},
 			{'not-connected': channel.type === 'lobby' && !network.status.connected},
+			{'network-down': channel.type !== 'lobby' && !network.status.connected},
 			{'is-muted': channel.muted},
 			{'is-typing': isTyping},
 			{'has-activity': hasActivity},

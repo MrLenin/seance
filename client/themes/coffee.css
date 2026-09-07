@@ -437,8 +437,16 @@ kbd {
 }
 
 #form .compose-bar,
-#form .upload-bar {
+#form .upload-bar,
+#form .connection-bar {
 	background: var(--tint-soft);
+}
+
+#form .connection-bar-connect,
+#form .connection-bar-connect:hover,
+#form .connection-bar-connect:focus-visible {
+	background: var(--tint-strong);
+	color: var(--chat-fg);
 }
 
 /* Message form */

@@ -463,3 +463,49 @@ Follow-ups: the lobby noise on a resume (open since round two); a
 background grace period in the native shells (E.4); the
 `Reconnecting in …` line could count down or offer a "now" tap for the rare
 wait a user does have to sit through.
+
+## Round eight: the conversation while the network is down (2026-09-07)
+
+Asked for: the send button disabled while the network is disconnected (typing
+still allowed), a visual cue on a disconnected channel or query that clears on
+reconnect, and a reconnecting indicator a phone user actually notices with the
+sidebar collapsed — nothing pushy or in the way.
+
+- **Send gate** (`ChatInput.vue` `canSend`): in a channel or query, while
+  `network.status.connected` is false, the send button is disabled (its
+  tooltip says "Not connected") and Enter keeps the draft. A draft that starts
+  with `/` is sendable regardless, because `/connect` and friends have to
+  work from a disconnected network — that is why the submit had no gate at
+  all before. The lobby is never gated: its input is for commands, and it is
+  where the connection reports.
+- **Faded conversation** (`Chat.vue` `isDisconnected`): the chat content —
+  messages and user list — fades to the pending-message opacity (0.55, with
+  a 0.3 s transition) while the network is down, and the sidebar rows of that
+  network's channels and queries fade the same way (`ChannelWrapper.vue`
+  `network-down`); the lobby row turns red as it always did. All of it is
+  computed from `network.status`, which `socket-events/network.ts` updates on
+  every `network:status`, so it clears the moment the network registers.
+- **Connection strip** (`ChatInput.vue` `showConnectionBar`, `.connection-bar`):
+  a row above the input in the family of the reply and upload strips.
+  While `status.connecting` — a dial or the wait before a retry — it shows a
+  turning sync glyph and `Connecting to <network>…`; when nothing is being
+  tried (the user cancelled with `/disconnect`, or a rejection ended it) it
+  shows `Disconnected from <network>.` and a Connect button that sends the
+  same `/connect` as the sidebar's status icon. It is `role="status" aria-live="polite"`, so assistive technology announces the change once; no
+  sound, no vibration, nothing modal. On a phone it sits right above the
+  keyboard, whatever the sidebar is doing; the header spinner stays as well.
+
+Not done, and why: a countdown in the strip (the store carries no retry
+delay, and after round seven the waits a user is looking at are short); a
+vibration or sound (pushy, and the OS decides whether a background page may).
+
+Browser check: `tools/scenarios/disconnected-channel.mjs` (18 checks: the
+three states, the draft kept through Enter, `/connect` sendable, the Connect
+button dialling, everything clearing on registration and a message going
+out), through `tools/scenarios/lib/irc-proxy.mjs` — the proxy of round
+seven, now shared. Run it on the phone layout as well:
+
+```sh
+node tools/browser-drive.mjs tools/scenarios/disconnected-channel.mjs --chrome=…
+node tools/browser-drive.mjs tools/scenarios/disconnected-channel.mjs --chrome=… --mobile --width=390 --height=844
+```
