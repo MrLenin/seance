@@ -27,7 +27,16 @@ export interface BrandingLinks {
 	website?: string;
 	help?: string;
 	privacy?: string;
+	/**
+	 * The GitHub repository the build comes from: Help's release notes,
+	 * commit and "report an issue" links (`helpers/sourceLinks.ts`). A fork
+	 * points it at itself.
+	 */
+	source?: string;
 }
+
+/** Where Seance itself lives; the default for every repository-shaped link. */
+export const UPSTREAM_REPOSITORY = "https://github.com/evilnet/seance";
 
 export interface BrandingFeatures {
 	/** Allow connecting to more than one network at a time. Default true. */
@@ -197,8 +206,9 @@ export const DEFAULT_BRANDING: BrandingConfig = {
 	defaultNetwork: undefined,
 	links: {
 		// Deploys override these with the network's own pages.
-		website: "https://github.com/evilnet/seance",
-		help: "https://github.com/evilnet/seance/tree/develop/docs",
+		website: UPSTREAM_REPOSITORY,
+		help: `${UPSTREAM_REPOSITORY}/tree/develop/docs`,
+		source: UPSTREAM_REPOSITORY,
 	},
 	features: {
 		multiNetwork: true,
@@ -532,7 +542,7 @@ export function normalizeBranding(
 
 	const links: BrandingLinks = {};
 
-	for (const key of ["website", "help", "privacy"] as const) {
+	for (const key of ["website", "help", "privacy", "source"] as const) {
 		const link = optionalUrl(rawLinks[key]) ?? defaults.links?.[key];
 
 		if (link !== undefined) {

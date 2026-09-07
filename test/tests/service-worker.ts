@@ -277,6 +277,8 @@ interface HarnessOptions {
 	/** Make `indexedDB.open` throw synchronously — the worker must still
 	 * show something rather than let handlePush reject silently. */
 	failIndexedDB?: boolean;
+	/** The registration's scope (default the app root; `push/<uuid>/` for a push-only worker). */
+	scope?: string;
 }
 
 const SCOPE = "https://app.test/";
@@ -317,7 +319,7 @@ function makeSW(muteList = "", options: HarnessOptions = {}): SWHarness {
 			},
 		},
 		registration: {
-			scope: SCOPE,
+			scope: options.scope ?? SCOPE,
 			getNotifications(filter?: {tag: string}): Promise<Rec[]> {
 				return Promise.resolve(
 					records.filter(
@@ -1321,5 +1323,57 @@ describe("service worker subscription renewal", function () {
 		expect(unregister, "old endpoint unregistered").to.be.greaterThan(-1);
 		expect(register, "new endpoint registered").to.be.greaterThan(-1);
 		expect(unregister, "unregister before register").to.be.lessThan(register);
+	});
+});
+
+describe("service worker build announcement", function () {
+	/** Fire the worker's `activate` and settle everything it waited on. */
+	async function activate(sw: SWHarness): Promise<void> {
+		const waited: Array<Promise<unknown>> = [];
+
+		for (const handler of sw.handlers.activate ?? []) {
+			handler({waitUntil: (p: Promise<unknown>) => waited.push(p)});
+		}
+
+		await Promise.all(waited);
+	}
+
+	/** What `activate` touches that the push harness has no need for. */
+	function withActivation(sw: SWHarness, onClaim: () => void = () => undefined): void {
+		sw.sandbox.caches.keys = (): Promise<string[]> => Promise.resolve(["older-build"]);
+		sw.sandbox.caches.delete = (): Promise<boolean> => Promise.resolve(true);
+
+		sw.sandbox.clients.claim = (): Promise<void> => {
+			onClaim();
+			return Promise.resolve();
+		};
+	}
+
+	it("tells every open window its build once it has claimed them", async function () {
+		const a = makeClient();
+		const b = makeClient();
+		const sw = makeSW("", {clients: [a, b]});
+		let postedAtClaim = -1;
+
+		withActivation(sw, () => {
+			postedAtClaim = a.posted.length;
+		});
+
+		await activate(sw);
+
+		// The source is unbuilt, so the token is still the placeholder.
+		expect(a.posted).to.deep.equal([{type: "build", build: "__HASH__"}]);
+		expect(b.posted).to.deep.equal([{type: "build", build: "__HASH__"}]);
+		expect(postedAtClaim, "claims before announcing").to.equal(0);
+	});
+
+	it("a push-only worker announces nothing (its build's root worker does)", async function () {
+		const a = makeClient();
+		const sw = makeSW("", {clients: [a], scope: `${SCOPE}push/net-1/`});
+		withActivation(sw);
+
+		await activate(sw);
+
+		expect(a.posted).to.deep.equal([]);
 	});
 });

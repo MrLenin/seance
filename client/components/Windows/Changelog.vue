@@ -6,21 +6,33 @@
 		<div class="container">
 			<router-link id="back-to-help" to="/help">« Help</router-link>
 
-			<h1 class="title">Release notes for {{ version }}</h1>
+			<h1 class="title">Release notes for v{{ build.release }}</h1>
 
-			<p>Release notes are not bundled with this build yet.</p>
+			<p v-if="pastRelease">
+				This build is
+				<a :href="source.commit" target="_blank" rel="noopener"
+					>commit <code>{{ build.gitCommit }}</code></a
+				>, after v{{ build.release }}:
+				<a :href="source.sinceRelease" target="_blank" rel="noopener"
+					>what changed since the release</a
+				>.
+			</p>
 			<p>
-				<a href="https://github.com/evilnet/seance/releases" target="_blank" rel="noopener"
-					>View releases on GitHub</a
+				Release notes are not bundled with the build.
+				<a :href="source.releaseNotes" target="_blank" rel="noopener"
+					>Read the notes for v{{ build.release }}</a
 				>
+				or
+				<a :href="source.releases" target="_blank" rel="noopener">see all releases</a>.
 			</p>
 		</div>
 	</div>
 </template>
 
 <script lang="ts">
-import {defineComponent} from "vue";
+import {computed, defineComponent} from "vue";
 import {useStore} from "../../js/store";
+import {buildIdentityOf, isPastRelease, sourceLinks} from "../../js/helpers/sourceLinks";
 import SidebarToggle from "../SidebarToggle.vue";
 
 export default defineComponent({
@@ -30,10 +42,14 @@ export default defineComponent({
 	},
 	setup() {
 		const store = useStore();
-		const version = store.state.serverConfiguration?.version || "";
+		const build = computed(() => buildIdentityOf(store.state.serverConfiguration));
+		const pastRelease = computed(() => isPastRelease(build.value));
+		const source = computed(() => sourceLinks(store.state.branding.links?.source, build.value));
 
 		return {
-			version,
+			build,
+			pastRelease,
+			source,
 		};
 	},
 });
