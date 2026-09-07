@@ -12,6 +12,9 @@ type SharedConfigurationBase = {
 	isUpdateAvailable: boolean;
 	applicationServerKey: string;
 	version: string;
+	/** The release this build is, or follows (Help links its notes). */
+	release: string;
+	/** Short sha the build was made from; null when unknown. */
 	gitCommit: string | null;
 	themes: ConfigTheme[];
 	defaultTheme: string;

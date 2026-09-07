@@ -6,6 +6,7 @@
 
 import {router} from "./router";
 import {reconnectAll} from "./irc/manager";
+import {checkForUpdate} from "./pwa";
 
 interface CapacitorBridge {
 	isNativePlatform?: () => boolean;
@@ -26,10 +27,12 @@ export function installNativeHooks(): void {
 		return;
 	}
 
-	// iOS/Android drop the WebSocket while backgrounded: retry on foreground.
+	// iOS/Android drop the WebSocket while backgrounded: retry on foreground,
+	// and look for a newer build while at it.
 	cap.addListener("App", "appStateChange", ({isActive}: {isActive?: boolean}) => {
 		if (isActive) {
 			reconnectAll();
+			checkForUpdate();
 		}
 	});
 

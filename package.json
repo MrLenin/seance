@@ -1,7 +1,7 @@
 {
   "name": "seance",
   "description": "Static, bouncer-less web IRC client: IRCv3 over WebSocket, no server of its own",
-  "version": "4.5.0-rc.3",
+  "version": "5.0.2",
   "type": "commonjs",
   "repository": {
     "type": "git",

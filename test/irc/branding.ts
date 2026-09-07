@@ -50,6 +50,7 @@ describe("branding", function () {
 				website: "https://github.com/evilnet/seance",
 				help: "https://github.com/evilnet/seance/tree/develop/docs",
 				privacy: "https://x.example/p",
+				source: "https://github.com/evilnet/seance",
 			});
 			expect(config.features).to.deep.equal({
 				multiNetwork: true,

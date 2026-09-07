@@ -58,20 +58,32 @@ Ship `NODE_ENV=production corepack yarn build`.
   of Chrome's error page. Runtime fetches are network-first with a cache
   fallback for everything else under the scope; WebSocket traffic never touches
   the worker.
-- **Updates.** Asset URLs and the worker's cache name carry a hash of
-  `package.json` `version`. A new release's worker installs on the next open,
-  `skipWaiting`s and claims the page; `pwa.ts` sees `controllerchange` while
-  already controlled and commits `updateAvailable`, which lights the Help icon
-  ("update available") and shows a "Reload to update" button at the top of
-  Help. Same-version redeploys are picked up silently because runtime fetches
-  are network-first. Installed windows have no reload button, hence the
-  in-app one (Ctrl/Cmd+R also works). The per-network **push-only workers**
-  (`push/<uuid>/`, see `client/js/webpush.ts`) get none of that for free: no
-  navigation ever lands inside their scope, a push event re-checks the script
-  at most once a day, and `register()` with the same URL checks nothing — so
-  the page calls `registration.update()` on every stored network's
-  registration as it boots (`syncStoredWithBrowser`) and whenever a subscribe
-  reuses one (`ensureRegistration`). Browser check:
+- **Updates.** Every build carries a _build token_ (`resolveBuild` in
+  `webpack.config.ts`: a hash of the version and the commit, so two builds of
+  different commits never share one; a dirty tree or a checkout without git
+  makes every build distinct): `?v=` on the asset URLs, the worker's cache
+  name, and `process.env.SEANCE_BUILD` in the bundle (`client/js/build.ts`).
+  A deploy is a byte-different `service-worker.js`, which the browser
+  installs when it next looks: on a page load, or when the app asks —
+  `pwa.ts` `checkForUpdate()`, from the foreground hooks (throttled to one
+  check per five minutes) and hourly while a window stays open, because
+  browsers never look on their own for a page that stays put. The new worker
+  precaches its shell, `skipWaiting`s, claims every window and announces
+  `{type: "build", build}` to them; a page whose own token differs commits
+  `updateAvailable`, which lights the Help icon ("update available") and
+  shows "Reload to update" at the top of Help. A page that has just loaded
+  already runs the new bundle (runtime fetches are network-first) and its
+  token matches, so it stays quiet — `controllerchange` alone could not tell
+  the two apart. Installed windows have no reload button, hence the in-app
+  one (Ctrl/Cmd+R also works). Browser check:
+  `tools/scenarios/update-signal.mjs` (needs a production build). The
+  per-network **push-only workers** (`push/<uuid>/`, see
+  `client/js/webpush.ts`) get none of that for free: no navigation ever lands
+  inside their scope, a push event re-checks the script at most once a day,
+  and `register()` with the same URL checks nothing — so the page calls
+  `registration.update()` on every stored network's registration as it boots
+  (`syncStoredWithBrowser`) and whenever a subscribe reuses one
+  (`ensureRegistration`). Browser check:
   `tools/scenarios/push-worker-update.mjs`.
 - **Notifications.** In-page `Notification`s are routed through the worker
   (`socket-events/msg.ts` → `{type: "notification"}` → `showNotification`), so

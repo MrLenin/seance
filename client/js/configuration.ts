@@ -21,8 +21,11 @@ const configuration: SharedConfiguration = {
 	ldapEnabled: false,
 	isUpdateAvailable: false,
 	applicationServerKey: "",
+	// The build's name, the release it is or follows, and the commit it was
+	// made from — filled in by webpack (`resolveBuild`); Help links them.
 	version: process.env.SEANCE_VERSION || pkg.version,
-	gitCommit: null,
+	release: process.env.SEANCE_RELEASE || pkg.version,
+	gitCommit: process.env.SEANCE_COMMIT || null,
 	// One CSS file each under client/themes/; docs/resources/themes.md. The
 	// two Ink & Amber themes carry their titlebar tone as the browser chrome
 	// colour, the older two leave it to the deploy's themeColor.

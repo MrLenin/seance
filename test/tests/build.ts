@@ -170,4 +170,25 @@ describe("public folder", function () {
 			done();
 		});
 	});
+
+	it("index.html, the service worker and the bundle carry one build token", function () {
+		// The page compares the token baked into its bundle with the one a
+		// newly activated worker announces (its cache name); the asset URLs
+		// carry it too so the precache keys match the page's requests.
+		const html = fs.readFileSync(path.join(publicFolder, "index.html"), "utf8");
+		const worker = fs.readFileSync(path.join(publicFolder, "service-worker.js"), "utf8");
+		const bundle = fs.readFileSync(path.join(publicFolder, "js", "bundle.js"), "utf8");
+
+		// Minified in a production build (`const cacheName="…"`).
+		const inWorker = /const cacheName\s*=\s*"([^"]+)"/.exec(worker);
+		expect(inWorker, "cacheName in service-worker.js").to.not.be.null;
+		const token = inWorker![1];
+		expect(token).to.match(/^(dev|[0-9a-f]{10})$/);
+
+		const inHtml = [...html.matchAll(/\?v=([^"&]+)"/g)].map((m) => m[1]);
+		expect(inHtml).to.not.be.empty;
+		expect(new Set(inHtml)).to.deep.equal(new Set([token]));
+
+		expect(bundle.includes(`"${token}"`), "the bundle carries the token").to.be.true;
+	});
 });

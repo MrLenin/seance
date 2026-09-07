@@ -10,27 +10,57 @@ import {createHash} from "crypto";
 import {readFileSync} from "fs";
 import pkg from "./package.json";
 
-function resolveVersion(): string {
-	const releaseVersion = process.env.SEANCE_VERSION?.trim();
-
-	if (releaseVersion) {
-		return releaseVersion.replace(/^v/, "");
-	}
-
-	try {
-		const git = (...args: string[]) => execFileSync("git", args, {encoding: "utf8"}).trim();
-		const tag = git("describe", "--tags", "--abbrev=0").replace(/^v/, "");
-		return `${tag}-${git("rev-parse", "--short=8", "HEAD")}`;
-	} catch {
-		return pkg.version;
-	}
+// What a build is, for the Help window and for telling one build from the
+// next (docs/resources/pwa.md § Updates).
+interface BuildIdentity {
+	/** What Help shows: `5.0.2` for a release, `5.0.2-e5ed5af2` past one. */
+	version: string;
+	/** The release this build is, or follows: the tag without its `v`. */
+	release: string;
+	/** Short sha of HEAD, or null outside a git checkout. */
+	commit: string | null;
+	/**
+	 * The build token: `?v=` on the asset URLs, the service worker's cache
+	 * name, `process.env.SEANCE_BUILD` in the bundle. Two builds of different
+	 * commits never share one, which is what makes a deploy detectable — the
+	 * browser only installs a new worker when the script's bytes change, and
+	 * the page only offers "Reload to update" when the worker's token is not
+	 * its own. Rebuilding the same clean commit gives the same token; a dirty
+	 * tree or no git at all makes every build distinct.
+	 */
+	build: string;
 }
 
-const version = resolveVersion();
+function resolveBuild(): BuildIdentity {
+	const git = (...args: string[]): string | null => {
+		try {
+			return execFileSync("git", args, {
+				encoding: "utf8",
+				stdio: ["ignore", "pipe", "ignore"],
+			}).trim();
+		} catch {
+			return null;
+		}
+	};
 
-// Short hash of the displayed version, appended to asset URLs so browsers
-// and the service worker refetch after a new build.
-const cacheBust = createHash("sha256").update(`v${version}`).digest("hex").substring(0, 10);
+	const commit = git("rev-parse", "--short=8", "HEAD");
+	const dirty = commit !== null && git("status", "--porcelain", "--untracked-files=no") !== "";
+	// The release workflow names the build after the tag it checks out; a
+	// checkout without tags (shallow clone) still names its commit.
+	const releaseVersion = process.env.SEANCE_VERSION?.trim().replace(/^v/, "");
+	const nearestTag = git("describe", "--tags", "--abbrev=0")?.replace(/^v/, "");
+	const release = releaseVersion || nearestTag || pkg.version;
+	const version = releaseVersion || (commit ? `${release}-${commit}` : release);
+	const identity = commit
+		? `${version}@${commit}${dirty ? `+${Date.now()}` : ""}`
+		: `${version}@${Date.now()}`;
+	const build = createHash("sha256").update(identity).digest("hex").substring(0, 10);
+
+	return {version, release, commit, build};
+}
+
+const buildIdentity = resolveBuild();
+const version = buildIdentity.version;
 
 // Build-time branding. `client/config.json` is the same file the app fetches
 // at runtime (copied to `public/config.json`); the values below only feed the
@@ -130,6 +160,10 @@ const miniCssExtractPlugin = new MiniCssExtractPlugin({
 });
 
 const isProduction = process.env.NODE_ENV === "production";
+
+// The token the built files carry (see BuildIdentity.build). A development
+// build is always `dev`: nothing is cached and no update is ever detected.
+const buildToken = isProduction ? buildIdentity.build : "dev";
 
 // Shared by the app and the service-worker push chunk below. A factory, not
 // a shared object: the development branch below mutates a rule's
@@ -255,6 +289,9 @@ const config: webpack.Configuration = {
 			__VUE_PROD_DEVTOOLS__: false,
 			__VUE_OPTIONS_API__: false,
 			"process.env.SEANCE_VERSION": JSON.stringify(version),
+			"process.env.SEANCE_RELEASE": JSON.stringify(buildIdentity.release),
+			"process.env.SEANCE_COMMIT": JSON.stringify(buildIdentity.commit ?? ""),
+			"process.env.SEANCE_BUILD": JSON.stringify(buildToken),
 		}),
 		miniCssExtractPlugin,
 		new CopyPlugin({
@@ -304,11 +341,7 @@ const config: webpack.Configuration = {
 					from: path.resolve(__dirname, "./client/index.html"),
 					to: "[name][ext]",
 					transform(content) {
-						return brandHtml(
-							content
-								.toString()
-								.replace(/__HASH__/g, isProduction ? cacheBust : "dev")
-						);
+						return brandHtml(content.toString().replace(/__HASH__/g, buildToken));
 					},
 				},
 				{
@@ -322,9 +355,7 @@ const config: webpack.Configuration = {
 					from: path.resolve(__dirname, "./client/service-worker.js"),
 					to: "[name][ext]",
 					transform(content) {
-						return content
-							.toString()
-							.replace("__HASH__", isProduction ? cacheBust : "dev");
+						return content.toString().replace("__HASH__", buildToken);
 					},
 				},
 				{
