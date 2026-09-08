@@ -74,6 +74,12 @@ interface ServerToClientEvents {
 		/** Epoch ms of the next automatic dial, only while waiting for a retry. */
 		retryAt?: number;
 	}>;
+	/**
+	 * A connect was dropped before it registered, for a reason the user has
+	 * to read (a refused SASL login the deploy insists on). The report is in
+	 * the lobby; the view follows it there.
+	 */
+	"network:aborted": EventHandler<{network: string; reason: string}>;
 	"network:info": EventHandler<{uuid: string}>;
 	"network:name": EventHandler<{uuid: string; name: string}>;
 

@@ -256,6 +256,33 @@ describe("IrcClient SASL", function () {
 		expectAborted(transport, client);
 	});
 
+	it("sends the view to the lobby, where the refusal is reported", function () {
+		// The connect flow has landed on an autojoin channel by now; the
+		// explanation is in the lobby, so network:aborted moves the view there.
+		const {client, transport} = setup();
+
+		offer(transport, `${OFFERED_CAPS} sasl=PLAIN`);
+		transport.line("AUTHENTICATE +");
+		transport.line(":irc.test 904 alice :SASL authentication failed");
+
+		const aborted = dispatch.getCalls().filter((c) => c.args[0] === "network:aborted");
+		expect(aborted).to.have.length(1);
+		expect(aborted[0].args[1]).to.deep.equal({
+			network: client.uuid,
+			reason: "SASL authentication failed",
+		});
+	});
+
+	it("does not move the view when the deploy connects anyway", function () {
+		const {transport} = setup(CARRY_ON);
+
+		offer(transport, `${OFFERED_CAPS} sasl=PLAIN`);
+		transport.line("AUTHENTICATE +");
+		transport.line(":irc.test 904 alice :SASL authentication failed");
+
+		expect(dispatch.getCalls().filter((c) => c.args[0] === "network:aborted")).to.be.empty;
+	});
+
 	it("leaves autoconnect alone when the deploy connects anyway", function () {
 		// Nothing was dropped, so there is no loop to break.
 		let rejected = 0;

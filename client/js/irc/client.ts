@@ -791,6 +791,9 @@ export class IrcClient {
 			true
 		);
 		this.pushMessage(this.lobby, {text: SASL_REQUIRED_HINT}, true);
+		// The connect flow has already opened an autojoin channel; the reason
+		// this network is empty is in the lobby, so the view goes there.
+		this.bus.dispatch("network:aborted", {network: this.uuid, reason});
 		this.options.onSaslRejected?.();
 		this.disconnect("SASL authentication failed");
 		return true;

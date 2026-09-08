@@ -124,7 +124,7 @@ A sign-in deploy keeps **one saved network**, whatever changes about the way in.
 
 A **refused login stands the entry down**: `saslDisconnectOnFail` drops the connection (see below), and the manager clears that network's `autoconnect`, so the next visit shows the panel again instead of retrying credentials the server has already refused at every page load, with no route back to the panel to fix them.
 
-> **Where the refusal is reported.** It goes to the network's lobby, but the connect flow lands on the last autojoin channel, so what the user sees first is an empty channel with an unread badge on the lobby beside it. The lobby then says exactly what happened. Worth knowing when writing `connect.signInIntro` copy; making a fatal connect error follow the user is a separate change to `openOnAnnounce` (`client/js/socket-events/network.ts`).
+A refusal is reported in the network's lobby, and the view follows it there (`network:aborted`, bus-contract §1.2): the connect flow has opened an autojoin channel by then, and an empty channel with the explanation behind an unread badge is not a report.
 
 Browser check: `tools/scenarios/sign-in.mjs` (the panel, a guest, a refused login, and the one-entry rule) — `yarn test` renders no component, so the panel is only ever verified there.
 
