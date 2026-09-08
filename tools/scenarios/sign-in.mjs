@@ -31,10 +31,9 @@
 //   * the panel has no server fields at all, and names the network instead;
 //   * a refused login is reported in the lobby and the connection dropped,
 //     rather than quietly registering the user as a stranger
-//     (`features.saslDisconnectOnFail`). Note where it is reported: the
-//     connect flow lands on the last autojoin channel, so the report waits
-//     in the lobby behind an unread badge rather than being on screen. See
-//     docs/resources/branding.md § The sign-in panel;
+//     (`features.saslDisconnectOnFail`), and the view follows the report to the
+//     lobby (`network:aborted`) instead of sitting on the empty autojoin channel
+//     the connect flow opened;
 //   * a refused login also stands the entry's `autoconnect` down, so the
 //     next visit asks again instead of failing the same way for ever with
 //     no route back to the panel (client.ts `onSaslRejected`);
@@ -148,9 +147,7 @@ export default async function run(page) {
 
 	// 2. Sign in on a first run, with credentials no services can confirm.
 	//    The account becomes the nick, the password goes out as SASL, and the
-	//    refusal is reported in the lobby — which is not where the connect
-	//    flow leaves you: `openOnAnnounce` lands on the last autojoin
-	//    channel, so the report is a badge away rather than on screen.
+	//    refusal is reported in the lobby, which the view moves to.
 	await page.evaluate(fill("#connect\\:saslAccount", "someaccount"));
 	await page.evaluate(fill("#connect\\:saslPassword", "wrong-password"));
 	await page.click('#connect input[name="rememberMe"]');
@@ -166,25 +163,20 @@ export default async function run(page) {
 	);
 	page.check('"Stay signed in" stored the password', afterSignIn[0]?.rememberPassword === true);
 	page.check(
-		"the lobby is marked unread for it",
-		await eventually(
-			`!!document.querySelector(".channel-list-item[data-type='lobby'] .badge")`,
-			20000,
-			"the lobby badge"
-		)
-	);
-	await page.screenshot("2-sasl-refused");
-
-	await page.click(".channel-list-item[data-type='lobby']");
-	await page.sleep(400);
-	page.check(
-		"and it says why, and that nothing was connected",
+		"the refusal is on screen: the view followed it to the lobby",
 		await eventually(
 			`${CHAT_TEXT}.includes("without the login you asked for")`,
-			10000,
+			20000,
 			"the SASL failure"
 		)
 	);
+	page.check(
+		"and the lobby is what is open",
+		(await page.evaluate(
+			`document.querySelector(".channel-list-item.active")?.dataset.type ?? ""`
+		)) === "lobby"
+	);
+	await page.screenshot("2-sasl-refused");
 	await page.screenshot("2b-lobby-report");
 
 	// 3. And it stood the entry down, so the next visit asks again instead of

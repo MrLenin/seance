@@ -1,6 +1,6 @@
 import socket from "../socket";
 import {getPendingTarget, isChannelTarget, takePendingTarget} from "../helpers/pendingTarget";
-import {beginLanding, pendingLanding, takeLanding} from "../helpers/lastChannel";
+import {beginLanding, cancelLanding, pendingLanding, takeLanding} from "../helpers/lastChannel";
 import {store} from "../store";
 import {findChannelByName, onStandalonePage, switchToChannel} from "../router";
 import {toClientChan} from "../chan";
@@ -80,6 +80,33 @@ socket.on("network:options", function (data) {
 	if (network) {
 		network.serverOptions = data.serverOptions;
 	}
+});
+
+/**
+ * The connect was dropped before it registered and the lobby says why. The
+ * connect flow lands on the last autojoin channel (`openOnAnnounce`), so
+ * without this the user sits on an empty channel with the explanation a
+ * badge away. Move to the lobby when the view is on that network or on
+ * nothing in particular; leave a page opened on purpose alone, as the
+ * announce does. Any landing still pending is called off: there is no
+ * conversation coming to land on.
+ */
+socket.on("network:aborted", function (data) {
+	const network = store.getters.findNetwork(data.network);
+
+	if (!network || network.channels.length === 0) {
+		return;
+	}
+
+	cancelLanding();
+
+	const active = store.state.activeChannel?.network;
+
+	if (onStandalonePage() || (active && active.uuid !== data.network)) {
+		return;
+	}
+
+	switchToChannel(network.channels[0]);
 });
 
 socket.on("network:status", function (data) {
