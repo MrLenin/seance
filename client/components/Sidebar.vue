@@ -163,23 +163,34 @@ export default defineComponent({
 			}
 		};
 
-		const onTouchEnd = () => {
-			if (!touchStartPos.value?.screenX || !touchCurPos.value?.screenX) {
-				return;
+		/** Owns the <body> listeners of the drag in flight. */
+		let drag: AbortController | undefined;
+
+		/**
+		 * End the drag and put everything back. `settled` is false when the
+		 * system took the touches (`touchcancel`): no toggle for a gesture
+		 * that went to iOS's own edge swipe.
+		 */
+		const endDrag = (settled: boolean) => {
+			const start = touchStartPos.value;
+			const current = touchCurPos.value;
+
+			// A null check, not a falsy one: `screenX` is 0 at the left edge,
+			// which is exactly where the gesture that opens the pane begins.
+			if (settled && start && current) {
+				const diff = current.screenX - start.screenX;
+				const absDiff = Math.abs(diff);
+
+				if (
+					absDiff > menuWidth.value / 2 ||
+					(Date.now() - touchStartTime.value < 180 && absDiff > 50)
+				) {
+					toggle(diff > 0);
+				}
 			}
 
-			const diff = touchCurPos.value.screenX - touchStartPos.value.screenX;
-			const absDiff = Math.abs(diff);
-
-			if (
-				absDiff > menuWidth.value / 2 ||
-				(Date.now() - touchStartTime.value < 180 && absDiff > 50)
-			) {
-				toggle(diff > 0);
-			}
-
-			document.body.removeEventListener("touchmove", onTouchMove);
-			document.body.removeEventListener("touchend", onTouchEnd);
+			drag?.abort();
+			drag = undefined;
 
 			store.commit("sidebarDragging", false);
 
@@ -199,8 +210,33 @@ export default defineComponent({
 			});
 		};
 
+		const onTouchEnd = () => endDrag(true);
+
+		// iOS reports a touch its own edge gesture took with `touchcancel`. (A
+		// left-edge swipe gets a plain `touchend` instead; router.ts keeps the
+		// history one deep so that gesture has nowhere to go.)
+		const onTouchCancel = () => endDrag(false);
+
 		const onTouchStart = (e: TouchEvent) => {
 			if (!sidebar.value) {
+				return;
+			}
+
+			// Dragging a selection handle is a horizontal drag too; the swipe
+			// stands down while there is a selection to protect (a tap
+			// collapses it).
+			const selection = window.getSelection();
+
+			if (selection && !selection.isCollapsed) {
+				return;
+			}
+
+			// A field's own selection is not in `getSelection()` (WebKit reports
+			// it collapsed), and the composer sits where the pane comes in from:
+			// no swipe starts inside a text field.
+			const target = e.target;
+
+			if (target instanceof Element && target.closest("input, textarea, [contenteditable]")) {
 				return;
 			}
 
@@ -221,9 +257,13 @@ export default defineComponent({
 				(touchStartPos.value?.screenX && touchStartPos.value.screenX > menuWidth.value)
 			) {
 				touchStartTime.value = Date.now();
+				drag = new AbortController();
 
-				document.body.addEventListener("touchmove", onTouchMove, {passive: true});
-				document.body.addEventListener("touchend", onTouchEnd, {passive: true});
+				const options = {passive: true, signal: drag.signal};
+
+				document.body.addEventListener("touchmove", onTouchMove, options);
+				document.body.addEventListener("touchend", onTouchEnd, options);
+				document.body.addEventListener("touchcancel", onTouchCancel, options);
 			}
 		};
 
@@ -233,6 +273,7 @@ export default defineComponent({
 
 		onUnmounted(() => {
 			document.body.removeEventListener("touchstart", onTouchStart);
+			drag?.abort(); // a drag in flight must not leave listeners on <body>
 		});
 
 		const appName = computed(() => store.state.branding.appName);

@@ -58,6 +58,9 @@
 						class="input"
 						name="host"
 						aria-label="Server address"
+						autocapitalize="off"
+						:autocorrect.attr="'off'"
+						spellcheck="false"
 						maxlength="255"
 						required
 					/>
@@ -105,6 +108,9 @@
 					class="input nick"
 					name="nick"
 					pattern="[^\s:!@]+"
+					autocapitalize="off"
+					:autocorrect.attr="'off'"
+					spellcheck="false"
 					maxlength="100"
 					required
 				/>
@@ -117,6 +123,9 @@
 					class="input"
 					name="join"
 					placeholder="#channel, #another key (joined on connect)"
+					autocapitalize="off"
+					:autocorrect.attr="'off'"
+					spellcheck="false"
 				/>
 			</div>
 			<div class="connect-row">
@@ -164,6 +173,9 @@ the server tab on new connection"
 						name="saslAccount"
 						maxlength="100"
 						autocomplete="username"
+						autocapitalize="off"
+						:autocorrect.attr="'off'"
+						spellcheck="false"
 						required
 					/>
 				</div>

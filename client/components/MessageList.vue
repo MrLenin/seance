@@ -81,6 +81,7 @@ import {
 } from "vue";
 import {useStore} from "../js/store";
 import {ClientChan, ClientMessage, ClientNetwork, ClientLinkPreview} from "../js/types";
+import {KEYBOARD_SETTLE_MS} from "../js/helpers/viewport";
 
 type CondensedMessageContainer = {
 	type: "condensed";
@@ -357,6 +358,32 @@ export default defineComponent({
 			await keepScrollPosition();
 		};
 
+		/** A text selection is held; scrolling the list under it loses it. */
+		const hasSelection = () => {
+			const selection = window.getSelection();
+
+			return !!selection && !selection.isCollapsed;
+		};
+
+		/**
+		 * A finger drag on the scrollback puts the keyboard away, like a native
+		 * scroll view's `keyboardDismissMode = .onDrag`. On `touchmove`, not
+		 * `scroll`: the list scrolls itself as messages arrive.
+		 */
+		const dismissKeyboard = () => {
+			// Dragging a selection handle is a touchmove too, and the resize a
+			// dismissed keyboard causes would scroll the list out from under it.
+			if (hasSelection()) {
+				return;
+			}
+
+			const active = document.activeElement as HTMLElement | null;
+
+			if (active && (active.tagName === "TEXTAREA" || active.tagName === "INPUT")) {
+				active.blur();
+			}
+		};
+
 		const handleScroll = () => {
 			// Setting scrollTop also triggers scroll event
 			// We don't want to perform calculations for that
@@ -375,14 +402,27 @@ export default defineComponent({
 		};
 
 		const handleResize = () => {
-			// Keep message list scrolled to bottom on resize
-			if (props.channel.scrolledToBottom) {
-				jumpToBottom();
+			// Keep the list at the bottom through a resize, except under a
+			// selection: the keyboard leaving is a resize too.
+			if (!props.channel.scrolledToBottom || hasSelection()) {
+				return;
 			}
+
+			jumpToBottom();
+
+			// The keyboard animates, so the first resize is measured midway and
+			// the scroll lands short of the settled bottom. Go again once it is
+			// done (helpers/viewport.ts re-measures on the same schedule).
+			setTimeout(() => {
+				if (!hasSelection()) {
+					jumpToBottom();
+				}
+			}, KEYBOARD_SETTLE_MS);
 		};
 
 		onMounted(() => {
 			chat.value?.addEventListener("scroll", handleScroll, {passive: true});
+			chat.value?.addEventListener("touchmove", dismissKeyboard, {passive: true});
 
 			eventbus.on("resize", handleResize);
 
@@ -470,6 +510,8 @@ export default defineComponent({
 		});
 
 		onUnmounted(() => {
+			chat.value?.removeEventListener("touchmove", dismissKeyboard);
+
 			if (historyObserver.value) {
 				historyObserver.value.disconnect();
 			}

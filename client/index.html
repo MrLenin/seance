@@ -7,6 +7,14 @@
 			content="width=device-width, user-scalable=no, interactive-widget=resizes-content"
 		/>
 
+		<!-- The first paint, before style.css lands: no white flash on launch.
+		     Ahead of the stylesheet link so the themes win once it arrives. -->
+		<style>
+			html {
+				background: __THEME_COLOR__;
+			}
+		</style>
+
 		<link rel="preload" as="script" href="js/loading-error-handlers.js?v=__HASH__" />
 		<link rel="preload" as="script" href="js/bundle.vendor.js?v=__HASH__" />
 		<link rel="preload" as="script" href="js/bundle.js?v=__HASH__" />
@@ -45,11 +53,19 @@
 		<meta name="msapplication-square150x150logo" content="img/apple-touch-icon-152.png" />
 
 		<meta name="apple-mobile-web-app-capable" content="yes" />
-		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+		<!-- iOS 26+ ignores this tag's colour, but `black-translucent` still puts
+		     the app under a blurred status-bar layer that softens the header.
+		     `default` leaves the bar opaque; #status-bar-tint below colours it.
+		     iOS freezes the value when the icon is added, so a change here only
+		     lands after the home-screen app is removed and re-added. -->
+		<meta name="apple-mobile-web-app-status-bar-style" content="default" />
 		<meta name="mobile-web-app-capable" content="yes" />
 		<meta name="theme-color" content="__THEME_COLOR__" />
 	</head>
 	<body>
+		<!-- What iOS samples for the status-bar colour (style.css). A real
+		     element, first in the body: the sampler ignores pseudo-elements. -->
+		<div id="status-bar-tint" aria-hidden="true"></div>
 		<div id="app"></div>
 		<div id="loading">
 			<div class="window">

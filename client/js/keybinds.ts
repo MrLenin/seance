@@ -1,7 +1,7 @@
 import Mousetrap from "mousetrap";
 
 import {store} from "./store";
-import {switchToChannel, router, navigate} from "./router";
+import {switchToChannel, router, navigate, leavePage} from "./router";
 import isChannelCollapsed from "./helpers/isChannelCollapsed";
 import isIgnoredKeybind from "./helpers/isIgnoredKeybind";
 import listenForTwoFingerSwipes from "./helpers/listenForTwoFingerSwipes";
@@ -202,9 +202,10 @@ const ignoredKeys = {
 };
 
 document.addEventListener("keydown", (e) => {
-	// Allow navigating back to the previous page when on the help screen.
+	// Escape leaves the help screen. Not `router.go(-1)`: the history is kept
+	// one deep (router.ts).
 	if (e.key === "Escape" && router.currentRoute.value.name === "Help") {
-		router.go(-1);
+		leavePage();
 		return;
 	}
 

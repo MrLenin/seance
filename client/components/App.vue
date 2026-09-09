@@ -171,6 +171,13 @@ export default defineComponent({
 
 			window.addEventListener("resize", debouncedResize.value, {passive: true});
 
+			// iOS makes room for the keyboard by shrinking the visual viewport
+			// without a window resize; the message list still has to re-stick
+			// to the bottom.
+			window.visualViewport?.addEventListener("resize", debouncedResize.value, {
+				passive: true,
+			});
+
 			// Emit a daychange event every time the day changes so date markers know when to update themselves
 			const emitDayChange = () => {
 				eventbus.emit("daychange");
@@ -190,6 +197,7 @@ export default defineComponent({
 
 			if (debouncedResize.value) {
 				window.removeEventListener("resize", debouncedResize.value);
+				window.visualViewport?.removeEventListener("resize", debouncedResize.value);
 			}
 
 			if (dayChangeTimeout.value) {
