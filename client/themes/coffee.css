@@ -96,6 +96,9 @@
 	--body-color: var(--chat-fg);
 	--body-color-muted: var(--chat-fg-muted);
 	--body-bg-color: var(--rail-bg-bottom);
+
+	/* The strip iOS paints above the app is next to the chat, not the rail. */
+	--canvas-bg-color: var(--chat-bg);
 	--button-color: var(--chat-accent);
 	--button-text-color-hover: var(--chat-accent-fg);
 	--link-color: var(--chat-accent);

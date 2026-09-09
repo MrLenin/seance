@@ -96,6 +96,10 @@
 	/* The sidebar scales at half rate — 16rem at medium, but a full 16rem of
 	 * a 34px root would not fit a phone — and never past the screen. */
 	--sidebar-width: min(calc(8rem + 128px), 85vw);
+
+	/* #status-bar-tint's height, and the room the sidebar leaves for it. In px:
+	 * it answers to iOS's sampler, not to the UI scale. */
+	--status-bar-tint-height: 8px;
 }
 
 /* The font-size setting's scale (client/js/helpers/fontSize.ts). */
@@ -128,8 +132,62 @@ html {
 	box-sizing: border-box;
 	-webkit-tap-highlight-color: transparent; /* remove tap highlight on touch devices */
 
-	/* What <body> leaves uncovered (see its height) stays the app's colour. */
-	background: var(--body-bg-color);
+	/* The canvas colour: what <body> leaves uncovered (see its height), and
+	 * what iOS paints into the status-bar strip above a home-screen web app.
+	 * That strip's neighbour is the chat area, so --body-bg-color is the wrong
+	 * end of the rail gradient for it — on a phone it reads as a dark band
+	 * under the clock. Themes point --canvas-bg-color at their content colour;
+	 * the ones that don't keep the old behaviour. */
+	background: var(--canvas-bg-color, var(--body-bg-color));
+}
+
+/* The status bar's colour on iOS 26+, which ignores both `theme-color` and
+ * `apple-mobile-web-app-status-bar-style`. What it reads instead is the
+ * background-color of a real, painted element fixed within 4px of the top of
+ * the page, tall enough, and at least 80% wide — a pseudo-element is
+ * invisible to it, and so is a fixed element carrying a `backdrop-filter`,
+ * which is why this is a plain <div> in index.html rather than a
+ * `body::before`. The height floor is the undocumented part: the community's
+ * iOS 26 findings say 3px, and 4px was measurably ignored on iOS 27, where
+ * 6px is where it starts being read (swept on a device, 2026-09-09). Eight
+ * leaves room for the next revision to move it again.
+ *
+ * Without a sampled element iOS falls back to <body>, and from 26.2 that
+ * fallback also lets the page render under the status bar behind a feathered
+ * blur — the band this exists to prevent.
+ *
+ * It paints, so it covers the first `--status-bar-tint-height` of the page:
+ * over the chat that is header background and invisible, but the sidebar puts
+ * its logo up there, so the sidebar reserves the same height. `visibility:
+ * hidden` would have avoided all of that — the community's iOS 26 notes say a
+ * hidden element is still sampled — but on iOS 27 it is not (measured).
+ *
+ * Touch devices only, the same gate the home-indicator inset uses further
+ * down: `-webkit-touch-callout` is WebKit's alone and every iOS browser is
+ * WebKit, and the coarse-pointer query keeps desktop Safari — where the
+ * sidebar is always open — out of it. */
+#status-bar-tint {
+	display: none;
+}
+
+@media (hover: none) and (pointer: coarse) {
+	@supports (-webkit-touch-callout: none) {
+		#status-bar-tint {
+			display: block;
+			position: fixed;
+			top: 0;
+			left: 0;
+			right: 0;
+			height: var(--status-bar-tint-height);
+			z-index: 2000;
+			pointer-events: none;
+			background-color: var(--canvas-bg-color, var(--body-bg-color));
+		}
+
+		#sidebar {
+			padding-top: var(--status-bar-tint-height);
+		}
+	}
 }
 
 *,

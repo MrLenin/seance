@@ -53,11 +53,19 @@
 		<meta name="msapplication-square150x150logo" content="img/apple-touch-icon-152.png" />
 
 		<meta name="apple-mobile-web-app-capable" content="yes" />
-		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+		<!-- iOS 26+ ignores this tag's colour, but `black-translucent` still puts
+		     the app under a blurred status-bar layer that softens the header.
+		     `default` leaves the bar opaque; #status-bar-tint below colours it.
+		     iOS freezes the value when the icon is added, so a change here only
+		     lands after the home-screen app is removed and re-added. -->
+		<meta name="apple-mobile-web-app-status-bar-style" content="default" />
 		<meta name="mobile-web-app-capable" content="yes" />
 		<meta name="theme-color" content="__THEME_COLOR__" />
 	</head>
 	<body>
+		<!-- What iOS samples for the status-bar colour (style.css). A real
+		     element, first in the body: the sampler ignores pseudo-elements. -->
+		<div id="status-bar-tint" aria-hidden="true"></div>
 		<div id="app"></div>
 		<div id="loading">
 			<div class="window">
