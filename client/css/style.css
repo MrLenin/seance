@@ -127,6 +127,9 @@ html[data-font-size="huge"] {
 html {
 	box-sizing: border-box;
 	-webkit-tap-highlight-color: transparent; /* remove tap highlight on touch devices */
+
+	/* What <body> leaves uncovered (see its height) stays the app's colour. */
+	background: var(--body-bg-color);
 }
 
 *,
@@ -169,6 +172,10 @@ body {
 }
 
 body {
+	/* The visual viewport on touch devices (helpers/viewport.ts), so iOS's
+	 * keyboard shrinks the app instead of covering the composer. Unset
+	 * elsewhere. */
+	height: var(--viewport-height, 100%);
 	background: var(--body-bg-color);
 	color: var(--body-color);
 	font: 1rem -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -686,6 +693,11 @@ p {
 #viewport {
 	display: flex;
 	height: 100%;
+
+	/* The containing block for #sidebar and the userlist. Against the layout
+	 * viewport, which iOS never shrinks for the keyboard, they would outgrow
+	 * the app and the sidebar's footer would sit below the screen. */
+	position: relative;
 }
 
 #form button,
@@ -3746,7 +3758,9 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	}
 
 	#sidebar-overlay {
-		position: fixed;
+		/* Absolute, not fixed: fixed measures against the layout viewport,
+		 * which iOS does not shrink for the keyboard (see #viewport). */
+		position: absolute;
 		top: 0;
 		bottom: 0;
 		left: 0;
