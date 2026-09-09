@@ -8,11 +8,13 @@
 				highlight: (message.highlight && store.state.settings.highlightMessages) || focused,
 				pending: message.pending,
 				'previous-source': isPreviousSource,
+				'actions-open': actionsOpen,
 			},
 		]"
 		:data-type="message.type"
 		:data-command="message.command"
 		:data-from="message.from && message.from.nick"
+		@click="toggleActions"
 	>
 		<span
 			aria-hidden="true"
@@ -194,10 +196,18 @@ import {MessageType} from "../../shared/types/msg";
 
 import type {ClientChan, ClientMessage, ClientNetwork} from "../js/types";
 import {useStore} from "../js/store";
+import {hasVirtualKeyboard} from "../js/helpers/device";
 
 MessageTypes.ParsedMessage = ParsedMessage;
 MessageTypes.LinkPreview = LinkPreview;
 MessageTypes.Username = Username;
+
+/**
+ * The id of the one message showing its tap-opened action toolbar. Shared by
+ * every Message so opening one closes the last; ids are unique across
+ * networks (js/irc/ids.ts), so no channel scope is needed.
+ */
+const openActions = ref<number | null>(null);
 
 export default defineComponent({
 	name: "Message",
@@ -217,6 +227,17 @@ export default defineComponent({
 	},
 	setup(props) {
 		const store = useStore();
+
+		// On a touch device the toolbar opens on a tap: the long press that
+		// fakes a hover is also how iOS starts a text selection (see the
+		// `hover: none` rules in style.css). Pointer devices keep hovering.
+		const actionsOpen = computed(() => openActions.value === props.message.id);
+
+		const toggleActions = () => {
+			if (hasVirtualKeyboard()) {
+				openActions.value = actionsOpen.value ? null : props.message.id;
+			}
+		};
 
 		const timeFormat = computed(() => {
 			let format: keyof typeof constants.timeFormats;
@@ -335,6 +356,8 @@ export default defineComponent({
 
 		return {
 			store,
+			actionsOpen,
+			toggleActions,
 			timeFormat,
 			messageTime,
 			messageTimeLocale,

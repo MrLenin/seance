@@ -4264,6 +4264,19 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	display: flex;
 }
 
+/* A touch device fakes hover on long press, which is also how a text
+ * selection starts, so on touch the toolbar opens on a tap instead
+ * (Message.vue sets `actions-open`). */
+@media (hover: none) {
+	#chat .msg:hover .msg-actions {
+		display: none;
+	}
+
+	#chat .msg.actions-open .msg-actions {
+		display: flex;
+	}
+}
+
 /* Never let the toolbar or the add-a-reaction button end up in copied text
    (see js/clipboard.ts) */
 #chat #js-copy-hack .msg-actions,

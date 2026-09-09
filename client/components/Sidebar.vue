@@ -204,6 +204,24 @@ export default defineComponent({
 				return;
 			}
 
+			// Dragging a selection handle is a horizontal drag too; the swipe
+			// stands down while there is a selection to protect (a tap
+			// collapses it).
+			const selection = window.getSelection();
+
+			if (selection && !selection.isCollapsed) {
+				return;
+			}
+
+			// A field's own selection is not in `getSelection()` (WebKit reports
+			// it collapsed), and the composer sits where the pane comes in from:
+			// no swipe starts inside a text field.
+			const target = e.target;
+
+			if (target instanceof Element && target.closest("input, textarea, [contenteditable]")) {
+				return;
+			}
+
 			touchStartPos.value = touchCurPos.value = e.touches.item(0);
 
 			if (e.touches.length !== 1) {
