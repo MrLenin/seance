@@ -1,5 +1,5 @@
 <template>
-	<form id="form" method="post" action="" @submit.prevent="onSubmit">
+	<form id="form" method="post" action="" @submit.prevent="onSubmit()">
 		<TypingIndicator :channel="channel" />
 		<div v-if="showConnectionBar" class="connection-bar" role="status" aria-live="polite">
 			<span
@@ -83,7 +83,7 @@
 			:value="channel.pendingMessage"
 			:placeholder="getInputPlaceholder(channel)"
 			@input="setPendingMessage"
-			@keypress.enter.exact.prevent="onSubmit"
+			@keypress.enter.exact="onEnterKey"
 			@blur="onBlur"
 		/>
 		<span
@@ -114,7 +114,16 @@
 			class="tooltipped tooltipped-w tooltipped-no-touch"
 			:data-tooltip="canSend ? 'Send message' : 'Not connected'"
 		>
-			<button id="submit" type="submit" aria-label="Send message" :disabled="!canSend" />
+			<!-- `mousedown.prevent` keeps focus in the textarea: a tap that blurs
+			it drops the keyboard, the viewport grows and the button moves out
+			from under the finger before the click lands. -->
+			<button
+				id="submit"
+				type="submit"
+				aria-label="Send message"
+				:disabled="!canSend"
+				@mousedown.prevent
+			/>
 		</span>
 	</form>
 </template>
@@ -148,6 +157,9 @@ import {
 	startEdit,
 } from "../js/helpers/compose";
 import {hasVirtualKeyboard} from "../js/helpers/device";
+
+/** How long after a Return its late-arriving newline is still recognised. */
+const ENTER_NEWLINE_WINDOW_MS = 500;
 import {TypingReporter} from "../js/helpers/typingReporter";
 import TypingIndicator from "./TypingIndicator.vue";
 
@@ -189,6 +201,26 @@ export default defineComponent({
 		const uploadInput = ref<HTMLInputElement>();
 		const autocompletionRef = ref<ReturnType<typeof autocompletion>>();
 
+		/**
+		 * Until when an `input` event holding nothing but newlines is the
+		 * Return that already sent (see onEnterKey). iOS applies that Return
+		 * some 70 ms after the keypress, into a composer the send has emptied;
+		 * left there, the next message goes out as a multiline batch with an
+		 * empty first line (ERR_NOTEXTTOSEND).
+		 */
+		let enterNewlineDeadline = 0;
+
+		/**
+		 * Plain assignment on purpose. iOS's stuck shift key (see onEnterKey)
+		 * is not fixable from here: focus(), blur()+focus(), a deferred clear,
+		 * execCommand("delete") and setRangeText were all tried.
+		 */
+		const clearInput = () => {
+			if (input.value) {
+				input.value.value = "";
+			}
+		};
+
 		const setInputSize = () => {
 			void nextTick(() => {
 				if (!input.value) {
@@ -228,7 +260,20 @@ export default defineComponent({
 		};
 
 		const setPendingMessage = (e: Event) => {
-			props.channel.pendingMessage = (e.target as HTMLInputElement).value;
+			const el = e.target as HTMLTextAreaElement;
+
+			// The Return that already sent, landing late (see onEnterKey).
+			if (enterNewlineDeadline > performance.now() && /^\n+$/.test(el.value)) {
+				enterNewlineDeadline = 0;
+				el.value = "";
+				props.channel.pendingMessage = "";
+				setInputSize();
+				return;
+			}
+
+			enterNewlineDeadline = 0;
+
+			props.channel.pendingMessage = el.value;
 			props.channel.inputHistoryPosition = 0;
 			props.channel.editDismissed = false; // typing re-arms ArrowUp-to-edit
 			setInputSize();
@@ -335,7 +380,7 @@ export default defineComponent({
 			return text.length > 80 ? text.slice(0, 79) + "…" : text;
 		});
 
-		const onSubmit = () => {
+		const onSubmit = (fromEnterKey = false) => {
 			if (!input.value) {
 				return;
 			}
@@ -351,9 +396,24 @@ export default defineComponent({
 			// rule that disables the send button); elsewhere the IRC layer
 			// answers it with NOT_CONNECTED_TEXT.
 			const target = props.channel.id;
-			const text = props.channel.pendingMessage;
+
+			// A keyboard that inserts the Return's newline before the keypress
+			// fires has already put it in the draft.
+			let text = props.channel.pendingMessage;
+
+			if (fromEnterKey && text.endsWith("\n")) {
+				text = text.slice(0, -1);
+				props.channel.pendingMessage = text;
+			}
 
 			if (text.length === 0 || !canSend.value) {
+				// Return on an empty composer inserts a newline; an offline
+				// composer keeps its draft.
+				if (text.length === 0 && fromEnterKey) {
+					clearInput();
+					setInputSize();
+				}
+
 				return false;
 			}
 
@@ -363,7 +423,7 @@ export default defineComponent({
 			// Editing to the identical text is a no-op: just leave edit mode.
 			if (editing && text === editing.text) {
 				cancelCompose(props.channel);
-				input.value.value = "";
+				clearInput();
 				setInputSize();
 				reportTyping(); // nothing was sent, so this is a real `done`
 				return false;
@@ -375,7 +435,7 @@ export default defineComponent({
 
 			props.channel.inputHistoryPosition = 0;
 			props.channel.pendingMessage = "";
-			input.value.value = "";
+			clearInput();
 			setInputSize();
 
 			// No `done` on submit: the `input` emit below makes the IRC layer
@@ -422,6 +482,23 @@ export default defineComponent({
 
 			props.channel.replyTo = null;
 			props.channel.editing = null;
+		};
+
+		/**
+		 * Return sends. On a touch device the keypress is not cancelled:
+		 * cancelling it leaves iOS's shift key down, so every message after the
+		 * first starts lowercase. The newline is let through and taken back out
+		 * by setPendingMessage when it arrives.
+		 */
+		const onEnterKey = (e: KeyboardEvent) => {
+			if (!hasVirtualKeyboard()) {
+				e.preventDefault();
+				onSubmit();
+				return;
+			}
+
+			enterNewlineDeadline = performance.now() + ENTER_NEWLINE_WINDOW_MS;
+			onSubmit(true);
 		};
 
 		const onUploadInputChange = () => {
@@ -752,6 +829,7 @@ export default defineComponent({
 			upload,
 			getInputPlaceholder,
 			onSubmit,
+			onEnterKey,
 			setPendingMessage,
 			cancelCompose,
 			composeNick,

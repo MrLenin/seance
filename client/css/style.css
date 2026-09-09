@@ -3006,6 +3006,27 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	position: relative;
 }
 
+/* Room for iOS's home indicator, which swallows taps aimed at a composer
+ * sitting in it. `viewport-fit=cover` would let `env(safe-area-inset-bottom)`
+ * measure it but costs 62px of unreachable screen, so the inset is reserved by
+ * hand — in px, since it mirrors the device, not the UI scale.
+ *
+ * iOS only: Android's navigation bar is outside the browser viewport, so the
+ * strip would be dead space there. `-webkit-touch-callout` exists in WebKit
+ * alone, and every iOS browser is WebKit. */
+@media (hover: none) and (pointer: coarse) {
+	@supports (-webkit-touch-callout: none) {
+		#form {
+			padding-bottom: 34px;
+		}
+
+		/* The keyboard covers the indicator while a field is focused. */
+		body:has(#form #input:focus) #form {
+			padding-bottom: 0.375rem;
+		}
+	}
+}
+
 #user-visible-error {
 	font-size: 0.9375rem;
 	line-height: 1.5;
