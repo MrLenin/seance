@@ -1,6 +1,6 @@
 import constants from "./constants";
 
-import {createRouter, createWebHashHistory} from "vue-router";
+import {createRouter, createWebHashHistory, type RouteLocationRaw} from "vue-router";
 import Connect from "../components/Windows/Connect.vue";
 import Settings from "../components/Windows/Settings.vue";
 import Help from "../components/Windows/Help.vue";
@@ -139,6 +139,26 @@ const router = createRouter({
 	],
 });
 
+/**
+ * Every in-app navigation is a replace: the history never grows past the
+ * entry the app opened on.
+ *
+ * iOS hands a swipe from within ~17px of the screen edge to its own
+ * back/forward gesture, installed app included, and the page cannot decline
+ * it: it is not scroll overscroll, so `overscroll-behavior` and `touch-action`
+ * do not reach it, and the sidebar's passive drag cannot `preventDefault`.
+ * Both recognisers ran — the pane toggled and the route went back under it —
+ * which surfaced as a stale second sidebar and swipes that "opened Settings".
+ * The one thing that stops it is having nothing to go back to.
+ *
+ * Overridden once here rather than at each call site, `<router-link>`
+ * included (it calls `router.push` on this instance), so a future push cannot
+ * bring the bug back. `replace()` does not go through `push`, so no recursion.
+ * The cost is the browser's Back button no longer stepping through
+ * conversations; the sidebar is the navigation.
+ */
+router.push = ((to: RouteLocationRaw) => router.replace(to)) as typeof router.push;
+
 /** A channel on `uuid` by name, case-insensitively (IRC names). */
 function findChannelByName(uuid: string, name: string): ClientChan | undefined {
 	const network = store.getters.findNetwork(uuid);
@@ -198,7 +218,48 @@ router.beforeEach((to, from) => {
 	return true;
 });
 
+/**
+ * The conversation last shown: what "back" means (Escape on Help, the Android
+ * back button) now that there is no history to step through.
+ */
+let lastConversationId: number | undefined;
+
+/**
+ * Leave a page the user opened on purpose (settings, help, a network's form)
+ * for the conversation they came from, else the first one there is, else the
+ * connect form. Returns whether it went anywhere.
+ */
+function leavePage(): boolean {
+	const previous =
+		lastConversationId === undefined
+			? undefined
+			: store.getters.findChannel(lastConversationId);
+
+	if (previous) {
+		switchToChannel(previous.channel);
+		return true;
+	}
+
+	const network = store.state.networks.find((n) => n.channels.length > 0);
+
+	if (network) {
+		switchToChannel(network.channels[0]);
+		return true;
+	}
+
+	if (router.currentRoute.value.name !== "Connect") {
+		void navigate("Connect");
+		return true;
+	}
+
+	return false;
+}
+
 router.afterEach((to) => {
+	if (to.name === "RoutedChat") {
+		lastConversationId = Number(to.params.id);
+	}
+
 	if (store.state.appLoaded) {
 		if (window.innerWidth <= constants.mobileViewportPixels) {
 			store.commit("sidebarOpen", false);
@@ -225,14 +286,9 @@ router.afterEach((to) => {
 });
 
 async function navigate(routeName: string, params: any = {}) {
-	if (router.currentRoute.value.name) {
-		await router.push({name: routeName, params});
-	} else {
-		// If current route is null, replace the history entry
-		// This prevents invalid entries from lingering in history,
-		// and then the route guard preventing proper navigation
-		await router.replace({name: routeName, params}).catch(() => {});
-	}
+	// Always a replace (see the `router.push` override); a guard refusing the
+	// navigation is not an error here.
+	await router.replace({name: routeName, params}).catch(() => {});
 }
 
 function switchToChannel(channel: ClientChan) {
@@ -278,4 +334,12 @@ if ("serviceWorker" in navigator) {
 	});
 }
 
-export {router, navigate, switchToChannel, onStandalonePage, openTarget, findChannelByName};
+export {
+	router,
+	navigate,
+	switchToChannel,
+	onStandalonePage,
+	openTarget,
+	findChannelByName,
+	leavePage,
+};

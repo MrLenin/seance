@@ -4,7 +4,7 @@
 // browser. Only the bridge's own `addListener` / `nativePromise` are used;
 // `Capacitor.Plugins` stays empty unless `@capacitor/core` is bundled.
 
-import {router} from "./router";
+import {leavePage, onStandalonePage} from "./router";
 import {reconnectAll} from "./irc/manager";
 import {checkForUpdate} from "./pwa";
 
@@ -36,8 +36,14 @@ export function installNativeHooks(): void {
 		}
 	});
 
-	// Android back button: router history, else minimize (overrides the default).
-	cap.addListener("App", "backButton", ({canGoBack}: {canGoBack?: boolean}) => {
-		canGoBack ? router.back() : void cap.nativePromise!("App", "minimizeApp", {});
+	// Android back button: leave a standalone page for the conversation it
+	// came from, else minimize (overrides the default). Not `router.back()`:
+	// the history is kept one deep (router.ts).
+	cap.addListener("App", "backButton", () => {
+		if (onStandalonePage() && leavePage()) {
+			return;
+		}
+
+		void cap.nativePromise!("App", "minimizeApp", {});
 	});
 }
