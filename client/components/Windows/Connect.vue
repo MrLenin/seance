@@ -127,6 +127,9 @@
 						name="host"
 						aria-label="Server address"
 						placeholder="irc.example.org"
+						autocapitalize="off"
+						:autocorrect.attr="'off'"
+						spellcheck="false"
 						maxlength="255"
 						required
 					/>
@@ -164,6 +167,9 @@
 					name="nick"
 					pattern="[^\s:!@]+"
 					maxlength="100"
+					autocapitalize="off"
+					:autocorrect.attr="'off'"
+					spellcheck="false"
 					required
 				/>
 			</div>
@@ -175,6 +181,9 @@
 					class="input"
 					name="join"
 					placeholder="#channel, #another (optional)"
+					autocapitalize="off"
+					:autocorrect.attr="'off'"
+					spellcheck="false"
 				/>
 			</div>
 
@@ -198,6 +207,9 @@
 						name="saslAccount"
 						maxlength="100"
 						autocomplete="username"
+						autocapitalize="off"
+						:autocorrect.attr="'off'"
+						spellcheck="false"
 						required
 					/>
 				</div>
