@@ -76,6 +76,7 @@ describe("public folder", function () {
 			"graybeard",
 			"1dirplus",
 			"basic",
+			"mardam",
 			"day",
 			"morning",
 		]) {
