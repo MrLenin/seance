@@ -74,28 +74,24 @@
 			</label>
 		</div>
 		<div class="settings-backup">
-			<h2>Backup</h2>
-			<p>
-				Save everything set up in this browser — settings, saved networks, mutes, ignore
-				lists, trusted media hosts — as one file, to keep or to set up {{ appName }} the
-				same way somewhere else. Restoring replaces all of it with the file's and reloads.
-			</p>
+			<h2>Backup and restore</h2>
+			<p>Save your settings to a file. You can restore here or on another device.</p>
 			<label class="opt">
 				<input v-model="includePasswords" type="checkbox" />
-				Include saved network passwords
+				Include network passwords
 				<span
 					class="tooltipped tooltipped-n tooltipped-no-delay"
-					aria-label="The file is not encrypted. Leave this off for a file you mean to share."
+					aria-label="Passwords are stored in the file unencrypted."
 				>
 					<button class="extra-help" />
 				</span>
 			</label>
 			<div class="opt">
 				<button type="button" class="btn" :disabled="busy" @click.prevent="download">
-					Download settings
+					Export settings…
 				</button>
 				<button type="button" class="btn" :disabled="busy" @click.prevent="pickFile">
-					Restore from file…
+					Import settings…
 				</button>
 				<input
 					ref="fileInput"
@@ -203,7 +199,7 @@ export default defineComponent({
 				// Revoke after the click has had its turn at the URL.
 				setTimeout(() => URL.revokeObjectURL(url), 10_000);
 			} catch (e) {
-				error.value = "Could not make the settings file.";
+				error.value = "Couldn't create the file.";
 			} finally {
 				busy.value = false;
 			}
@@ -217,15 +213,14 @@ export default defineComponent({
 		const describe = (backup: SettingsBackup, name: string) => {
 			const networks = networkCount(backup);
 			const parts = [
-				"every setting",
-				networks === 1 ? "the saved network" : `the ${networks} saved networks`,
-				"mutes, ignore lists and sort orders",
+				"your settings",
+				networks === 1 ? "1 network" : `${networks} networks`,
+				"mutes and ignore lists",
 			];
-			const passwords = hasPasswords(backup) ? " The file carries network passwords." : "";
-			const when = backup.exportedAt ? ` It was made ${backup.exportedAt.slice(0, 10)}.` : "";
+			const passwords = hasPasswords(backup) ? " The file includes network passwords." : "";
 			return (
-				`Replaces ${parts.join(", ")} in this browser with what ${name} holds, ` +
-				`then reloads.${passwords}${when}`
+				`This replaces ${parts.join(", ")} with the contents of ${name}, ` +
+				`then reloads.${passwords}`
 			);
 		};
 
@@ -233,9 +228,9 @@ export default defineComponent({
 			eventbus.emit(
 				"confirm-dialog",
 				{
-					title: "Restore settings from this file?",
+					title: "Import settings?",
 					text: describe(backup, name),
-					button: "Restore and reload",
+					button: "Import and reload",
 				},
 				(confirmed: boolean) => {
 					if (!confirmed) {
@@ -266,7 +261,7 @@ export default defineComponent({
 				restore(backup, file.name);
 			} catch (e) {
 				error.value =
-					e instanceof BackupFormatError ? e.message : "Could not read that file.";
+					e instanceof BackupFormatError ? e.message : "Couldn't read the file.";
 			} finally {
 				busy.value = false;
 			}

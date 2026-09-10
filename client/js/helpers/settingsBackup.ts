@@ -203,23 +203,21 @@ export class BackupFormatError extends Error {}
 
 function validate(value: unknown): SettingsBackup {
 	if (typeof value !== "object" || value === null) {
-		throw new BackupFormatError("This is not a settings file.");
+		throw new BackupFormatError("This isn't a settings file.");
 	}
 
 	const obj = value as Record<string, unknown>;
 
 	if (obj.format !== FORMAT) {
-		throw new BackupFormatError("This is not a settings file.");
+		throw new BackupFormatError("This isn't a settings file.");
 	}
 
 	if (typeof obj.version !== "number" || obj.version > VERSION) {
-		throw new BackupFormatError(
-			"This settings file was made by a newer version; update first."
-		);
+		throw new BackupFormatError("This file was made by a newer version.");
 	}
 
 	if (typeof obj.entries !== "object" || obj.entries === null || Array.isArray(obj.entries)) {
-		throw new BackupFormatError("This settings file is damaged.");
+		throw new BackupFormatError("This file is damaged.");
 	}
 
 	return {
@@ -237,13 +235,13 @@ export async function decodeBackup(bytes: Uint8Array): Promise<SettingsBackup> {
 
 	if (isGzip(bytes)) {
 		if (typeof DecompressionStream === "undefined") {
-			throw new BackupFormatError("This browser cannot read compressed settings files.");
+			throw new BackupFormatError("This browser can't read compressed files.");
 		}
 
 		try {
 			json = await pipe(bytes, new DecompressionStream("gzip"));
 		} catch (e) {
-			throw new BackupFormatError("This settings file is damaged.");
+			throw new BackupFormatError("This file is damaged.");
 		}
 	}
 
@@ -252,7 +250,7 @@ export async function decodeBackup(bytes: Uint8Array): Promise<SettingsBackup> {
 	try {
 		parsed = JSON.parse(new TextDecoder().decode(json));
 	} catch (e) {
-		throw new BackupFormatError("This is not a settings file.");
+		throw new BackupFormatError("This isn't a settings file.");
 	}
 
 	return validate(parsed);

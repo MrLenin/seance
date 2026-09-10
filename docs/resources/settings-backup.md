@@ -1,6 +1,6 @@
 # Settings backup
 
-Settings → General → Backup lets a person download everything they have set
+Settings → General → Backup and restore lets a person download everything they have set
 up in this browser as one file and restore it on another device or hand it
 to a friend who wants the same setup. Code: `client/js/helpers/settingsBackup.ts`
 (Vue-free, `test/helpers/settingsBackup.ts`) and the Backup section of
@@ -52,7 +52,7 @@ The restore never writes a key outside the list above, whatever the file
 holds.
 
 **Passwords.** The saved networks' `saslPassword` is stripped unless
-"Include saved network passwords" is ticked (the stripped entries get
+"Include network passwords" is ticked (the stripped entries get
 `rememberPassword: false`, so the connect form asks again). The file is not
 encrypted; the checkbox's tooltip says so. The restore dialog says when the
 file it is about to apply carries passwords.
@@ -65,8 +65,8 @@ still carries every setting.
 ## Restoring
 
 Choosing a file decodes and validates it, then asks through the app's confirm
-dialog (naming the file, the number of networks, whether it carries passwords
-and when it was made). On confirm, `applyBackup` removes every covered key
+dialog (naming the file, the number of networks and whether it carries
+passwords). On confirm, `applyBackup` removes every covered key
 present in storage and writes the file's, and the page reloads — that is how
 every module re-reads its storage (the settings store, `saved-networks.ts`,
 `sort.ts`, `mute.ts`, `ignore.ts`, `mediaTrust.ts` all load at boot). Nothing
