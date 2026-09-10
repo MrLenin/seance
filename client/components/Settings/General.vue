@@ -73,15 +73,74 @@
 				/>
 			</label>
 		</div>
+		<div class="settings-backup">
+			<h2>Backup</h2>
+			<p>
+				Save everything set up in this browser — settings, saved networks, mutes, ignore
+				lists, trusted media hosts — as one file, to keep or to set up {{ appName }} the
+				same way somewhere else. Restoring replaces all of it with the file's and reloads.
+			</p>
+			<label class="opt">
+				<input v-model="includePasswords" type="checkbox" />
+				Include saved network passwords
+				<span
+					class="tooltipped tooltipped-n tooltipped-no-delay"
+					aria-label="The file is not encrypted. Leave this off for a file you mean to share."
+				>
+					<button class="extra-help" />
+				</span>
+			</label>
+			<div class="opt">
+				<button type="button" class="btn" :disabled="busy" @click.prevent="download">
+					Download settings
+				</button>
+				<button type="button" class="btn" :disabled="busy" @click.prevent="pickFile">
+					Restore from file…
+				</button>
+				<input
+					ref="fileInput"
+					type="file"
+					class="sr-only"
+					aria-label="Settings file to restore"
+					:accept="`${fileExtension},application/json`"
+					@change="onFileChosen"
+				/>
+			</div>
+			<p v-if="error" class="settings-backup-error" role="alert">{{ error }}</p>
+		</div>
 	</div>
 </template>
 
-<style></style>
+<style>
+#settings .settings-backup p {
+	color: var(--body-color-muted);
+}
+
+#settings .settings-backup .settings-backup-error {
+	padding: 0.5em 0.75em;
+	border-radius: 0.25em;
+	color: var(--error-fg, #a94442);
+	background-color: var(--error-bg, #f2dede);
+}
+</style>
 
 <script lang="ts">
 import {computed, defineComponent, onMounted, ref} from "vue";
 import {useStore} from "../../js/store";
 import {promptInstall} from "../../js/pwa";
+import eventbus from "../../js/eventbus";
+import {
+	applyBackup,
+	BackupFormatError,
+	collectBackup,
+	decodeBackup,
+	encodeBackup,
+	FILE_EXTENSION,
+	fileName,
+	hasPasswords,
+	networkCount,
+	SettingsBackup,
+} from "../../js/helpers/settingsBackup";
 
 export default defineComponent({
 	name: "GeneralSettings",
@@ -114,12 +173,119 @@ export default defineComponent({
 			window.navigator.registerProtocolHandler("web+irc", uri, appName.value);
 		};
 
+		// Settings backup (helpers/settingsBackup.ts). The download is a
+		// gzipped JSON file; a restore replaces every covered localStorage
+		// entry and reloads, which is how every module re-reads its storage.
+		const includePasswords = ref(false);
+		const busy = ref(false);
+		const error = ref("");
+		const fileInput = ref<HTMLInputElement>();
+
+		const download = async () => {
+			error.value = "";
+			busy.value = true;
+
+			try {
+				const backup = collectBackup({
+					includePasswords: includePasswords.value,
+					settings: {...store.state.settings},
+					app: appName.value,
+				});
+				const bytes = await encodeBackup(backup);
+				const blob = new Blob([bytes as BlobPart], {type: "application/octet-stream"});
+				const url = URL.createObjectURL(blob);
+				const link = document.createElement("a");
+				link.href = url;
+				link.download = fileName(appName.value);
+				document.body.appendChild(link);
+				link.click();
+				link.remove();
+				// Revoke after the click has had its turn at the URL.
+				setTimeout(() => URL.revokeObjectURL(url), 10_000);
+			} catch (e) {
+				error.value = "Could not make the settings file.";
+			} finally {
+				busy.value = false;
+			}
+		};
+
+		const pickFile = () => {
+			error.value = "";
+			fileInput.value?.click();
+		};
+
+		const describe = (backup: SettingsBackup, name: string) => {
+			const networks = networkCount(backup);
+			const parts = [
+				"every setting",
+				networks === 1 ? "the saved network" : `the ${networks} saved networks`,
+				"mutes, ignore lists and sort orders",
+			];
+			const passwords = hasPasswords(backup) ? " The file carries network passwords." : "";
+			const when = backup.exportedAt ? ` It was made ${backup.exportedAt.slice(0, 10)}.` : "";
+			return (
+				`Replaces ${parts.join(", ")} in this browser with what ${name} holds, ` +
+				`then reloads.${passwords}${when}`
+			);
+		};
+
+		const restore = (backup: SettingsBackup, name: string) => {
+			eventbus.emit(
+				"confirm-dialog",
+				{
+					title: "Restore settings from this file?",
+					text: describe(backup, name),
+					button: "Restore and reload",
+				},
+				(confirmed: boolean) => {
+					if (!confirmed) {
+						return;
+					}
+
+					// Nothing runs between the write and the reload, so no
+					// in-memory state can overwrite the file's entries.
+					applyBackup(backup);
+					window.location.reload();
+				}
+			);
+		};
+
+		const onFileChosen = async (event: Event) => {
+			const input = event.target as HTMLInputElement;
+			const file = input.files?.[0];
+			input.value = ""; // so choosing the same file again fires change
+
+			if (!file) {
+				return;
+			}
+
+			busy.value = true;
+
+			try {
+				const backup = await decodeBackup(new Uint8Array(await file.arrayBuffer()));
+				restore(backup, file.name);
+			} catch (e) {
+				error.value =
+					e instanceof BackupFormatError ? e.message : "Could not read that file.";
+			} finally {
+				busy.value = false;
+			}
+		};
+
 		return {
 			appName,
 			store,
 			canRegisterProtocol,
 			nativeInstallPrompt,
 			registerProtocol,
+			includePasswords,
+			busy,
+			error,
+			fileInput,
+			fileExtension: FILE_EXTENSION,
+			download,
+			pickFile,
+			onFileChosen,
 		};
 	},
 });
