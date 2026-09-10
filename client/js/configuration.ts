@@ -40,6 +40,7 @@ const configuration: SharedConfiguration = {
 		{name: "bourbaki", displayName: "Bourbaki", themeColor: "#000000"},
 		{name: "gates", displayName: "Gates", themeColor: "#0000aa"},
 		{name: "mardam", displayName: "Mardam", themeColor: "#d4d0c8"},
+		{name: "zelenzy", displayName: "Zelenzy", themeColor: "#ece9d8"},
 		{name: "panasync", displayName: "Panasync", themeColor: "#000000"},
 		{name: "day", displayName: "Day", themeColor: null},
 		{name: "morning", displayName: "Morning", themeColor: null},

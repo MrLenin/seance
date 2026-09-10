@@ -78,6 +78,7 @@ describe("public folder", function () {
 			"bourbaki",
 			"gates",
 			"mardam",
+			"zelenzy",
 			"panasync",
 			"day",
 			"morning",
