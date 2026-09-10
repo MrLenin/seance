@@ -20,8 +20,8 @@ const colorCodeMap = [
 const timeFormats = {
 	msgDefault: "HH:mm",
 	msgWithSeconds: "HH:mm:ss",
-	msg12h: "hh:mm A",
-	msg12hWithSeconds: "hh:mm:ss A",
+	msg12h: "h:mma",
+	msg12hWithSeconds: "h:mm:ssa",
 };
 
 export default {

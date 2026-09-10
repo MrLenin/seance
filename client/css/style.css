@@ -1851,7 +1851,7 @@ textarea.input {
 #chat .from {
 	padding-right: 0.625rem;
 	text-align: right;
-	width: 8.5rem;
+	width: 7rem;
 	overflow: hidden;
 	white-space: nowrap;
 	position: relative;
