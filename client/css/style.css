@@ -93,9 +93,10 @@
 	 * sensible on purpose: the ends exist for eyes that need them. */
 	font-size: 100%;
 
-	/* The sidebar scales at half rate — 16rem at medium, but a full 16rem of
-	 * a 34px root would not fit a phone — and never past the screen. */
-	--sidebar-width: min(calc(8rem + 128px), 85vw);
+	/* The sidebar scales at half rate — 220px at medium, 248px at large; a
+	 * full 14rem of a 34px root would not fit a phone — and never past the
+	 * screen. */
+	--sidebar-width: min(calc(7rem + 108px), 85vw);
 
 	/* #status-bar-tint's height, and the room the sidebar leaves for it. In px:
 	 * it answers to iOS's sampler, not to the UI scale. */
