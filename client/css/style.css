@@ -1838,18 +1838,20 @@ textarea.input {
 #chat .time {
 	color: var(--body-color-muted);
 	padding-left: 0.625rem;
-	width: 3.5rem;
+	/* Sized to the text: 00:00 in the browser's sans is about 2.5em with
+	 * tabular figures; 12:34pm and 00:00:00 about 4em; 12:34:56pm 5.35em. */
+	width: 2.75rem;
 	font-variant-numeric: tabular-nums;
 	box-sizing: content-box; /* highlights have a border-left */
 }
 
 #chat.time-12h .time,
 #chat.time-seconds .time {
-	width: 4.75rem;
+	width: 4.25rem;
 }
 
 #chat.time-seconds.time-12h .time {
-	width: 5.75rem;
+	width: 5.5rem;
 }
 
 #chat .from {
