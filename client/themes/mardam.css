@@ -166,8 +166,11 @@ body,
 	color: #dbe6f5;
 }
 
-#viewport .lt,
-#viewport .rt,
+/* Only on the bar: on the other windows (settings, help, the changelog, a
+ * network's form) the toggle sits on the window and keeps coffee's muted
+ * tone. */
+#chat .header .lt,
+#chat .header .rt,
 #chat button.mentions,
 #chat button.search,
 #chat button.menu,
@@ -175,7 +178,7 @@ body,
 	color: #fff;
 }
 
-#viewport .lt::after {
+#chat .header .lt::after {
 	background-color: #fff;
 }
 
