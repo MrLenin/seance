@@ -98,6 +98,9 @@
 	 * screen. */
 	--sidebar-width: min(calc(7rem + 108px), 85vw);
 
+	/* The user list likewise: 180px at medium, 204px at large. */
+	--userlist-width: min(calc(6rem + 84px), 85vw);
+
 	/* #status-bar-tint's height, and the room the sidebar leaves for it. In px:
 	 * it answers to iOS's sampler, not to the UI scale. */
 	--status-bar-tint-height: 8px;
@@ -1670,7 +1673,7 @@ textarea.input {
 
 #chat .userlist {
 	border-left: 1px solid #e7e7e7;
-	width: 12rem;
+	width: var(--userlist-width);
 	display: none;
 	flex-direction: column;
 	flex-shrink: 0;
@@ -1753,7 +1756,7 @@ textarea.input {
 }
 
 .userlist-open .chat-view[data-type="channel"] .scroll-down {
-	right: calc(12rem + 1rem);
+	right: calc(var(--userlist-width) + 1rem);
 }
 
 #chat .messages {
@@ -3885,7 +3888,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 		height: 100%;
 		position: absolute;
 		right: 0;
-		transform: translateX(12rem);
+		transform: translateX(var(--userlist-width));
 		transition: transform 0.2s;
 		z-index: 1;
 	}
