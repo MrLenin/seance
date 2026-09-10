@@ -27,7 +27,16 @@ const MEASURE = `(() => {
 	const t = msg.querySelector(".time"), f = msg.querySelector(".from");
 	const textW = (el) => { const r = document.createRange(); r.selectNodeContents(el); return r.getBoundingClientRect().width; };
 	const c = msg.querySelector(".content");
+	const ch = (() => { const e = document.createElement("span"); e.textContent = "0"; e.style.cssText = "position:absolute;visibility:hidden;white-space:pre"; c.appendChild(e); const w = e.getBoundingClientRect().width; e.remove(); return w; })();
+	const ul = document.querySelector("#chat .userlist");
+	const messages = document.querySelector("#chat .messages");
 	return {
+		ch,
+		contentCh: (c.clientWidth - parseFloat(getComputedStyle(c).paddingLeft) - parseFloat(getComputedStyle(c).paddingRight)) / ch,
+		fromCh: (f.clientWidth - parseFloat(getComputedStyle(f).paddingLeft) - parseFloat(getComputedStyle(f).paddingRight)) / ch,
+		userlist: ul ? (getComputedStyle(ul).display === "none" ? "closed" : getComputedStyle(ul).position === "absolute" ? "overlay" : "panel") : "none",
+		layout: getComputedStyle(msg).display === "flex" ? "columns" : "inline",
+		rowOverflow: messages.scrollWidth > messages.clientWidth,
 		time: t.textContent.trim(), timeCol: t.getBoundingClientRect().width, timeText: textW(t),
 		timeLines: (() => { const r = document.createRange(); r.selectNodeContents(t); return r.getClientRects().length; })(),
 		fromCol: f.getBoundingClientRect().width, fromText: textW(f),
@@ -76,6 +85,58 @@ export default async function run(page) {
 		);
 		await page.screenshot(`gutter-${CLOCK}-${step}`, {clip: box});
 	}
+	// Now the squeeze: the user list open, the window narrowed step by step.
+	// The text column keeps 30 characters while the list is a side panel,
+	// the nick column never drops under 9ch, and once the pane is too
+	// narrow for both the list lies over the chat instead.
+	const WIDTHS = [1400, 1100, 960, 860, 780, 600, 390];
+	const squeeze = [];
+	for (const step of ["medium", "large", "huge"]) {
+		await page.evaluate(`document.documentElement.dataset.fontSize = ${JSON.stringify(step)}`);
+		for (const width of WIDTHS) {
+			await page.send("Emulation.setDeviceMetricsOverride", {
+				width,
+				height: 900,
+				deviceScaleFactor: 1,
+				mobile: false,
+			});
+			await page.sleep(150);
+			const m = await page.evaluate(MEASURE);
+			squeeze.push({step, width, ...m});
+			const tag = `${step} @${width}`;
+			if (m.layout === "columns") page.check(`${tag}: nick column >= 9ch`, m.fromCh >= 8.9);
+			// Inline flow can still overflow on an unbreakable word (a long URL
+			// at a big step in a phone-width pane); that is the word, not the
+			// columns.
+			if (m.layout === "columns")
+				page.check(`${tag}: no horizontal overflow`, !m.rowOverflow);
+			if (m.layout === "columns" && m.userlist !== "panel")
+				page.check(`${tag}: columns only with room for them`, m.contentCh >= 29.5);
+			if (m.userlist === "panel")
+				page.check(`${tag}: 30ch of text beside the panel`, m.contentCh >= 29.5);
+			if (step === "large") await page.screenshot(`squeeze-${step}-${width}`);
+		}
+	}
+	console.table(
+		squeeze.map((r) => ({
+			step: r.step,
+			width: r.width,
+			layout: r.layout,
+			userlist: r.userlist,
+			contentCh: r.contentCh.toFixed(1),
+			fromCh: r.fromCh.toFixed(1),
+			ch: r.ch.toFixed(1),
+			overflow: r.rowOverflow,
+		}))
+	);
+	await page.send("Emulation.setDeviceMetricsOverride", {
+		width: 1280,
+		height: 900,
+		deviceScaleFactor: 1,
+		mobile: false,
+	});
+	await page.evaluate(`document.documentElement.dataset.fontSize = "large"`);
+
 	console.table(
 		rows.map((r) => ({
 			...r,
