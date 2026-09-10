@@ -74,9 +74,10 @@ describe("public folder", function () {
 			"cobalt",
 			"frost",
 			"graybeard",
-			"1dirplus",
-			"basic",
+			"bourbaki",
+			"gates",
 			"mardam",
+			"panasync",
 			"day",
 			"morning",
 		]) {

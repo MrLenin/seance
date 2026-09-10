@@ -1,4 +1,4 @@
-/* 1DIR Plus — the DOS directory manager. Not one framed window like an IDE:
+/* Bourbaki — the DOS directory manager (1DIR Plus). Not one framed window like an IDE:
  * a set of separate boxes on black, each ruled with a double line in bright
  * blue and set apart by a gutter, titles in yellow, names in cyan, sizes in
  * white, the one hot item in light red with a pointer, and a row of small
@@ -8,7 +8,7 @@
  * no rounded corner anywhere, and the frames: the rail's list, the channel
  * header, the scrollback, the user list, the command line and each footer
  * button are their own box (day.css's 5px viewport padding becomes the
- * gutter). basic.css is the same palette as one IDE window on the CGA blue.
+ * gutter). gates.css is the same palette as one IDE window on the CGA blue.
  *
  * Everything reads on black; the dimmest text (#a0a0a0, icons) is 8:1 and
  * the bright-blue rules are 3.7:1. Light red (#ff5555) is 5.7:1 on black, so

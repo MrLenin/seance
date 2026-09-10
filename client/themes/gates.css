@@ -1,8 +1,8 @@
-/* BASIC — a DOS-era IDE (QBasic, the Turbo languages): light text on the CGA
+/* Gates — a DOS-era IDE (QBasic, the Turbo languages): light text on the CGA
  * blue (#0000aa), and the blue is the whole screen — rail, window, command
  * line, menus, panels; nothing is black. One big window in a double
  * bright-blue frame, titles in yellow. coffee.css's rules with the sixteen-colour EGA palette, a monospace
- * face and no rounded corner anywhere. 1dirplus.css is the same palette laid
+ * face and no rounded corner anywhere. bourbaki.css is the same palette laid
  * out as the directory manager's boxes on black.
  *
  * Contrast on the blue: white 8.6:1, cyan 10.4:1, yellow 11.6:1, the light
