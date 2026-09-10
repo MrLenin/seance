@@ -73,6 +73,7 @@ describe("public folder", function () {
 			"creama",
 			"cobalt",
 			"frost",
+			"molokai",
 			"princess",
 			"princess_",
 			"sandrof",

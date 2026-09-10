@@ -25,12 +25,23 @@ const IRCD = process.env.SEANCE_IRC_WS ?? "ws://127.0.0.1:8067/";
 const TARGET = new URL(IRCD);
 // Coffee last: it is what the page boots on, and the store only writes a
 // setting that changed.
-const THEMES = ["creama", "cobalt", "frost", "princess", "princess_", "day", "morning", "coffee"];
+const THEMES = [
+	"creama",
+	"cobalt",
+	"frost",
+	"molokai",
+	"princess",
+	"princess_",
+	"day",
+	"morning",
+	"coffee",
+];
 const OWN_COLOR = {
 	coffee: "#1a1816",
 	creama: "#efe9de",
 	cobalt: "#101720",
 	frost: "#eef2f7",
+	molokai: "#1b1d1e",
 	princess: "#f2f7fc",
 	princess_: "#000000",
 };
