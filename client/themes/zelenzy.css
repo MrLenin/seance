@@ -157,6 +157,7 @@
 
 #chat .userlist {
 	background: var(--chat-bg);
+	border-left: 0;
 	box-shadow: inset 1px 0 0 var(--win-shadow);
 }
 

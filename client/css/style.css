@@ -1686,6 +1686,22 @@ textarea.input {
 	flex-direction: column;
 	flex-shrink: 0;
 	touch-action: pan-y;
+	position: relative;
+}
+
+/* Several themes draw the list's edge as an inset box-shadow (a sunken
+ * frame, a coloured rule). An inset shadow paints under the children, and
+ * the sticky mode headings ("Operators", "Users") have a background, so
+ * the edge went missing behind every heading. This overlay paints the
+ * same shadow again above everything; the themes keep setting it on the
+ * list itself. */
+#chat .userlist::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	z-index: 1;
+	box-shadow: inherit;
 }
 
 /**
@@ -3946,7 +3962,6 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 		right: 0;
 		top: 0;
 		z-index: 1;
-		box-shadow: 0 0 25px 0 rgb(0 0 0 / 50%);
 	}
 
 	.userlist-open .chat-view[data-type="channel"] .scroll-down {
