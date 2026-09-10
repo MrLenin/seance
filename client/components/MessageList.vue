@@ -61,7 +61,6 @@
 import {condensedTypes} from "../../shared/irc";
 import {ChanType} from "../../shared/types/chan";
 import {MessageType, SharedMsg} from "../../shared/types/msg";
-import eventbus from "../js/eventbus";
 import clipboard from "../js/clipboard";
 import socket from "../js/socket";
 import Message from "./Message.vue";
@@ -81,7 +80,6 @@ import {
 } from "vue";
 import {useStore} from "../js/store";
 import {ClientChan, ClientMessage, ClientNetwork, ClientLinkPreview} from "../js/types";
-import {KEYBOARD_SETTLE_MS} from "../js/helpers/viewport";
 
 type CondensedMessageContainer = {
 	type: "condensed";
@@ -116,13 +114,20 @@ export default defineComponent({
 		const isWaitingForNextTick = ref(false);
 
 		const jumpToBottom = () => {
-			skipNextScrollEvent.value = true;
 			props.channel.scrolledToBottom = true;
 
 			const el = chat.value;
 
 			if (el) {
+				// A scroll event follows only if something moved; a flag armed
+				// for nothing would swallow the user's next real scroll.
+				const before = el.scrollTop;
+
 				el.scrollTop = el.scrollHeight;
+
+				if (el.scrollTop !== before) {
+					skipNextScrollEvent.value = true;
+				}
 			}
 		};
 
@@ -401,30 +406,22 @@ export default defineComponent({
 			props.channel.scrolledToBottom = el.scrollHeight - el.scrollTop - el.offsetHeight <= 30;
 		};
 
-		const handleResize = () => {
-			// Keep the list at the bottom through a resize, except under a
-			// selection: the keyboard leaving is a resize too.
-			if (!props.channel.scrolledToBottom || hasSelection()) {
-				return;
+		// The list's box follows the composer, the typing indicator, the user
+		// list, the window and iOS's stepped keyboard shrink: one observer,
+		// after layout. Not under a selection, which the scroll would lose.
+		const resizeObserver = new ResizeObserver(() => {
+			if (props.channel.scrolledToBottom && !hasSelection()) {
+				jumpToBottom();
 			}
-
-			jumpToBottom();
-
-			// The keyboard animates, so the first resize is measured midway and
-			// the scroll lands short of the settled bottom. Go again once it is
-			// done (helpers/viewport.ts re-measures on the same schedule).
-			setTimeout(() => {
-				if (!hasSelection()) {
-					jumpToBottom();
-				}
-			}, KEYBOARD_SETTLE_MS);
-		};
+		});
 
 		onMounted(() => {
 			chat.value?.addEventListener("scroll", handleScroll, {passive: true});
 			chat.value?.addEventListener("touchmove", dismissKeyboard, {passive: true});
 
-			eventbus.on("resize", handleResize);
+			if (chat.value) {
+				resizeObserver.observe(chat.value);
+			}
 
 			void nextTick(() => {
 				if (historyObserver.value && loadMoreButton.value) {
@@ -467,14 +464,6 @@ export default defineComponent({
 			}
 		);
 
-		watch(
-			() => props.channel.pendingMessage,
-			async () => {
-				// Keep the scroll stuck when input gets resized while typing
-				await keepScrollPosition();
-			}
-		);
-
 		// Release the typing indicator's reserved line when a new message is
 		// actually rendered (last rendered item changed — a history prepend
 		// does not count). This runs before the DOM update, so the new line
@@ -490,22 +479,12 @@ export default defineComponent({
 			}
 		);
 
-		watch(
-			() => props.channel.typing.length > 0 || props.channel.typingReserved,
-			async () => {
-				// The typing indicator line above the input appears (and is later
-				// released by a new message): keep the list stuck to the bottom
-				// across that height change, like an input resize.
-				await keepScrollPosition();
-			}
-		);
-
 		onBeforeUpdate(() => {
 			unreadMarkerShown = false;
 		});
 
 		onBeforeUnmount(() => {
-			eventbus.off("resize", handleResize);
+			resizeObserver.disconnect();
 			chat.value?.removeEventListener("scroll", handleScroll);
 		});
 
