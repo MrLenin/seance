@@ -3177,7 +3177,12 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	margin: 5px;
 	padding: 0;
 	resize: none;
-	flex: 1 0 auto;
+
+	/* Fill what the buttons leave, never the textarea's own 20-column width:
+	   at large font steps on a phone that is wider than the form, and iOS
+	   then pans the page to the caret. */
+	flex: 1 1 0;
+	min-width: 0;
 	align-self: center;
 	touch-action: pan-y;
 	caret-color: var(--link-color);
