@@ -8,7 +8,6 @@ import babelConfig from "./babel.config.cjs";
 import {execFileSync} from "child_process";
 import {createHash} from "crypto";
 import {readFileSync} from "fs";
-import pkg from "./package.json";
 
 // What a build is, for the Help window and for telling one build from the
 // next (docs/resources/pwa.md § Updates).
@@ -45,11 +44,14 @@ function resolveBuild(): BuildIdentity {
 
 	const commit = git("rev-parse", "--short=8", "HEAD");
 	const dirty = commit !== null && git("status", "--porcelain", "--untracked-files=no") !== "";
-	// The release workflow names the build after the tag it checks out; a
-	// checkout without tags (shallow clone) still names its commit.
+	// The release workflow names the build after the tag it checks out;
+	// otherwise the nearest tag names the release the build follows. The tag
+	// is the only source of a version — package.json carries none — so a
+	// checkout without tags (a shallow clone, no git) is "dev" plus its
+	// commit.
 	const releaseVersion = process.env.SEANCE_VERSION?.trim().replace(/^v/, "");
 	const nearestTag = git("describe", "--tags", "--abbrev=0")?.replace(/^v/, "");
-	const release = releaseVersion || nearestTag || pkg.version;
+	const release = releaseVersion || nearestTag || "dev";
 	const version = releaseVersion || (commit ? `${release}-${commit}` : release);
 	const identity = commit
 		? `${version}@${commit}${dirty ? `+${Date.now()}` : ""}`

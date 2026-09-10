@@ -9,7 +9,6 @@
 // `fileUpload` (with `fileUploadMaxFileSize`) when `branding.uploads` names
 // an uploader endpoint.
 
-import pkg from "../../package.json";
 import type {SharedConfiguration} from "../../shared/types/config";
 
 const configuration: SharedConfiguration = {
@@ -22,9 +21,10 @@ const configuration: SharedConfiguration = {
 	isUpdateAvailable: false,
 	applicationServerKey: "",
 	// The build's name, the release it is or follows, and the commit it was
-	// made from — filled in by webpack (`resolveBuild`); Help links them.
-	version: process.env.SEANCE_VERSION || pkg.version,
-	release: process.env.SEANCE_RELEASE || pkg.version,
+	// made from — filled in by webpack (`resolveBuild`, from the release's
+	// tag; package.json carries no version); Help links them.
+	version: process.env.SEANCE_VERSION || "dev",
+	release: process.env.SEANCE_RELEASE || "dev",
 	gitCommit: process.env.SEANCE_COMMIT || null,
 	// One CSS file each under client/themes/; docs/resources/themes.md. The
 	// four handoff themes (Ink & Amber, Cobalt Frost) carry their titlebar
