@@ -155,8 +155,27 @@
 	box-shadow: inset 0 0 0 1px var(--win-shadow);
 }
 
+/* Only the chat window has the terminal panes. The dialogs — settings, help,
+ * the connect form, the changelog, search results — are XP dialogs on the
+ * face grey: the window tokens are re-mapped on those windows, so everything
+ * in them that reads a token follows. Black on the face 17.4:1, muted 5.6:1,
+ * the selection blue for links and buttons 4.6:1. */
+.window:not(#chat) {
+	--window-bg-color: var(--win-face);
+	--body-color: #000;
+	--body-color-muted: #5a5a5a;
+	--window-heading-color: #000;
+	--link-color: var(--win-select);
+	--button-color: var(--win-select);
+	--button-text-color-hover: #fff;
+
+	background: var(--window-bg-color); /* mardam paints .window with --chat-bg */
+	color: var(--body-color);
+}
+
 #chat .userlist {
 	background: var(--chat-bg);
+	border-left: 0;
 	box-shadow: inset 1px 0 0 var(--win-shadow);
 }
 
