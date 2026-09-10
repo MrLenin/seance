@@ -37,6 +37,7 @@ const configuration: SharedConfiguration = {
 		{name: "frost", displayName: "Frost", themeColor: "#eef2f7"},
 		{name: "graybeard", displayName: "Graybeard", themeColor: "#020402"},
 		{name: "1dirplus", displayName: "1DIR Plus", themeColor: "#000000"},
+		{name: "basic", displayName: "BASIC", themeColor: "#0000aa"},
 		{name: "day", displayName: "Day", themeColor: null},
 		{name: "morning", displayName: "Morning", themeColor: null},
 	],

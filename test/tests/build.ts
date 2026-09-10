@@ -75,6 +75,7 @@ describe("public folder", function () {
 			"frost",
 			"graybeard",
 			"1dirplus",
+			"basic",
 			"day",
 			"morning",
 		]) {
