@@ -1838,16 +1838,18 @@ textarea.input {
 #chat .time {
 	color: var(--body-color-muted);
 	padding-left: 0.625rem;
+
 	/* Sized to the text: 00:00 in the browser's sans is about 2.5em with
 	 * tabular figures; 12:34pm and 00:00:00 about 4em; 12:34:56pm 5.35em. */
 	width: 2.75rem;
+	white-space: nowrap;
 	font-variant-numeric: tabular-nums;
 	box-sizing: content-box; /* highlights have a border-left */
 }
 
 #chat.time-12h .time,
 #chat.time-seconds .time {
-	width: 4.25rem;
+	width: 4.125rem;
 }
 
 #chat.time-seconds.time-12h .time {
@@ -1855,10 +1857,15 @@ textarea.input {
 }
 
 #chat .from {
-	padding-right: 0.625rem;
+	padding: 0.2em 0.5rem;
 	text-align: right;
 	width: 7rem;
+
+	/* A nick wider than the column overflows at the right whatever the
+	 * alignment, so that is where it is cut: an ellipsis, so the start of
+	 * the nick is what stays. About ten characters at the default scale. */
 	overflow: hidden;
+	text-overflow: ellipsis;
 	white-space: nowrap;
 	position: relative;
 }
@@ -1866,7 +1873,7 @@ textarea.input {
 #chat .content {
 	flex: 1 1 auto;
 	min-width: 0;
-	padding-left: 0.625rem;
+	padding-left: 0.5rem;
 	padding-right: 0.375rem;
 	border-left: 1px solid #f6f6f6;
 	overflow: hidden; /* Prevents Zalgo text to expand beyond messages */
@@ -3802,14 +3809,6 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 
 .tooltipped::after {
 	font-size: 0.8125rem;
-}
-
-@media (min-width: 480px) {
-	/* Fade out for long usernames */
-	#chat .from {
-		padding-left: 10px;
-		mask-image: linear-gradient(to left, transparent, black 10px);
-	}
 }
 
 @media (max-width: 768px) {
