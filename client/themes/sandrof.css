@@ -1,7 +1,8 @@
-/* Graybeard — phosphor green on black. coffee.css's rules with a terminal
- * palette: the chat on a near-black with a hint of green, the rail a CRT with
- * scanlines and a soft phosphor glow, everything in green. Colour (and a
- * monospace face) only.
+/* Sandrof — named for ircII's author; phosphor green on black. coffee.css's
+ * rules with a terminal palette: the chat on a near-black with a hint of
+ * green, the rail a CRT with scanlines and a soft phosphor glow, everything
+ * in green. Colour (and a monospace face) only. oikarinen.css is the same
+ * screen in amber and imports this one.
  *
  * The nick palette is 32 slots (style.css hashes nicks into 32); the theme is
  * monochrome so nicks stay in the green family and differ by lightness and a
@@ -94,6 +95,17 @@ input,
 select,
 textarea {
 	font-family: "DejaVu Sans Mono", "Fira Mono", "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* A monospace face is wider than the base stylesheet's timestamp column
+ * allows for; room for "07:52 PM" and "07:52:30 PM". */
+#chat.time-12h .time,
+#chat.time-seconds .time {
+	width: 5.25rem;
+}
+
+#chat.time-seconds.time-12h .time {
+	width: 7rem;
 }
 
 /* Text glows a little, like phosphor. */
