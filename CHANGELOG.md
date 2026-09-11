@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 <!-- New entries go after this line -->
 
+## Unreleased
+
+- Attention: a hidden page (or one unfocused for a minute) tells the server `AWAY *` (`draft/pre-away`: away for an unspecified reason, per connection, never overriding a `/away` the user set) and clears it on return, so the server's push rule stops treating "spoke a moment ago, then switched apps" as attended. A hidden page no longer marks the open channel read; attention returning does. Another user's `AWAY *` shows as away without a reason.
+
 ## v4.5.0-rc.3 - 2026-05-12 [Pre-release]
 
 [See the full changelog](https://github.com/thelounge/thelounge/compare/v4.5.0-rc.2...v4.5.0-rc.3)
