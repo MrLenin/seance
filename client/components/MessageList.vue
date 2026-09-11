@@ -389,6 +389,13 @@ export default defineComponent({
 			}
 		};
 
+		// The box height the list was last seen at. A scroll event that
+		// arrives with a different one is the browser moving the list as it
+		// re-lays it out (a rotation, the keyboard, a toolbar) and comes
+		// before the resize observer in the same frame: not the user, so it
+		// must not decide whether the list is still pinned.
+		let seenHeight = 0;
+
 		const handleScroll = () => {
 			// Setting scrollTop also triggers scroll event
 			// We don't want to perform calculations for that
@@ -399,7 +406,7 @@ export default defineComponent({
 
 			const el = chat.value;
 
-			if (!el) {
+			if (!el || el.clientHeight !== seenHeight) {
 				return;
 			}
 
@@ -410,6 +417,8 @@ export default defineComponent({
 		// list, the window and iOS's stepped keyboard shrink: one observer,
 		// after layout. Not under a selection, which the scroll would lose.
 		const resizeObserver = new ResizeObserver(() => {
+			seenHeight = chat.value?.clientHeight ?? 0;
+
 			if (props.channel.scrolledToBottom && !hasSelection()) {
 				jumpToBottom();
 			}
