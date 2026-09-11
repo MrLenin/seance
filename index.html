@@ -1,0 +1,10 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Seance scrollback A/B</title>
+<style>body{font:18px system-ui;margin:2rem;line-height:2}</style>
+<h1>Seance scrollback A/B</h1>
+<p>Same phone, same channel, scroll up for history in each:</p>
+<ul>
+<li><a href="base/">base/</a> — 2026-09-06 merge (1f7decd7), "was working"</li>
+<li><a href="develop/">develop/</a> — develop head (d6b6624b), current deploy</li>
+<li><a href="pr51/">pr51/</a> — PR #51 fix (verified compensation + armed auto-load)</li>
+</ul>
+<p>Each is its own origin path, so settings and networks are separate; the service worker registers per path too.</p>

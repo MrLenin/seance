@@ -1,0 +1,2 @@
+(globalThis.webpackChunkseance=globalThis.webpackChunkseance||[]).push([[555],{7740(){Prism.languages.hsts={directive:{pattern:/\b(?:includeSubDomains|max-age|preload)(?=[\s;=]|$)/i,alias:"property"},operator:/=/,punctuation:/;/}}}]);
+//# sourceMappingURL=prism-hsts.js.map

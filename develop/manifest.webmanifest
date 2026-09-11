@@ -1,0 +1,49 @@
+{
+	"name": "Seance",
+	"short_name": "Seance",
+	"description": "IRC client",
+	"start_url": "./",
+	"scope": "./",
+	"display": "standalone",
+	"theme_color": "#1a1816",
+	"background_color": "#1a1816",
+	"categories": [
+		"social",
+		"communication"
+	],
+	"launch_handler": {
+		"client_mode": "focus-existing"
+	},
+	"protocol_handlers": [
+		{
+			"protocol": "web+irc",
+			"url": "./?uri=%s"
+		}
+	],
+	"icons": [
+		{
+			"src": "img/icon-192.png",
+			"type": "image/png",
+			"sizes": "192x192",
+			"purpose": "any"
+		},
+		{
+			"src": "img/icon-512.png",
+			"type": "image/png",
+			"sizes": "512x512",
+			"purpose": "any"
+		},
+		{
+			"src": "img/icon-maskable-192.png",
+			"type": "image/png",
+			"sizes": "192x192",
+			"purpose": "maskable"
+		},
+		{
+			"src": "img/icon-maskable-512.png",
+			"type": "image/png",
+			"sizes": "512x512",
+			"purpose": "maskable"
+		}
+	]
+}

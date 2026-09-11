@@ -1,0 +1,2 @@
+(globalThis.webpackChunkseance=globalThis.webpackChunkseance||[]).push([[4768],{5265(){!function(e){var a=e.util.clone(e.languages.typescript);e.languages.tsx=e.languages.extend("jsx",a),delete e.languages.tsx.parameter,delete e.languages.tsx["literal-property"];var s=e.languages.tsx.tag;s.pattern=RegExp(/(^|[^\w$]|(?=<\/))/.source+"(?:"+s.pattern.source+")",s.pattern.flags),s.lookbehind=!0}(Prism)}}]);
+//# sourceMappingURL=prism-tsx.js.map
