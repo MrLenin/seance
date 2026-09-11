@@ -3123,8 +3123,12 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
  *
  * iOS only: Android's navigation bar is outside the browser viewport, so the
  * strip would be dead space there. `-webkit-touch-callout` exists in WebKit
- * alone, and every iOS browser is WebKit. */
-@media (hover: none) and (pointer: coarse) {
+ * alone, and every iOS browser is WebKit.
+ *
+ * Portrait only: in landscape the indicator is thinner and the composer is
+ * tappable without the strip (phone-verified 2026-09-11), so the strip would
+ * only take rows from a viewport that has few to spare. */
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
 	@supports (-webkit-touch-callout: none) {
 		#form {
 			padding-bottom: 34px;
