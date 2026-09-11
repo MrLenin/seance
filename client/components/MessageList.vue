@@ -115,7 +115,69 @@ export default defineComponent({
 
 		const isWaitingForNextTick = ref(false);
 
+		/**
+		 * Auto-loading older history is armed by a real scroll and disarmed
+		 * by each load. A page that lands while the scroller is still moving
+		 * (a fling, a held finger: WebKit drops the programmatic scrollTop the
+		 * compensation writes) leaves the view at the top with the button
+		 * still in view, and the button re-renders with every page, which
+		 * re-fires the observer -- so without this gate one lost compensation
+		 * chain-loads page after page ("hours past where you were"). Now a
+		 * lost compensation costs at most one page, and the next load needs a
+		 * scroll of the user's own.
+		 */
+		let autoLoadArmed = true;
+		/** When the last prepend was compensated, for the re-arm delay. */
+		let lastPrependAt = 0;
+		/** The anchor the last compensation restored, verified afterwards. */
+		let pendingAnchor: {heightOld: number; at: number} | null = null;
+		let verifyTimer: ReturnType<typeof setTimeout> | null = null;
+
+		/** Re-arm on a scroll that is not the tail of the last prepend. */
+		const REARM_AFTER_MS = 400;
+		/** How long a compensation is re-checked against a momentum scroll. */
+		const VERIFY_FOR_MS = 600;
+		const ANCHOR_TOLERANCE = 4;
+
+		/**
+		 * Confirm the compensation stuck. WebKit ignores a scrollTop written
+		 * during momentum scrolling and rubber-banding; when the anchor is
+		 * lost within VERIFY_FOR_MS of the write, stop the momentum (toggling
+		 * overflow is the one thing that does) and write it again.
+		 */
+		const verifyAnchor = () => {
+			const el = chat.value;
+			const anchor = pendingAnchor;
+
+			if (!el || !anchor) {
+				return;
+			}
+
+			if (Date.now() - anchor.at > VERIFY_FOR_MS) {
+				pendingAnchor = null; // the user has moved on; leave them be
+				return;
+			}
+
+			if (verifyTimer !== null) {
+				clearTimeout(verifyTimer);
+			}
+
+			if (Math.abs(el.scrollHeight - el.scrollTop - anchor.heightOld) <= ANCHOR_TOLERANCE) {
+				// Holding, for now: momentum can still take it within the window.
+				verifyTimer = setTimeout(verifyAnchor, 100);
+				return;
+			}
+
+			el.style.overflow = "hidden";
+			void el.offsetHeight; // flush: this is what kills the momentum
+			el.style.overflow = "";
+			skipNextScrollEvent.value = true;
+			el.scrollTop = el.scrollHeight - anchor.heightOld;
+			verifyTimer = setTimeout(verifyAnchor, 100);
+		};
+
 		const jumpToBottom = () => {
+			pendingAnchor = null; // a jump supersedes any anchor being verified
 			skipNextScrollEvent.value = true;
 			props.channel.scrolledToBottom = true;
 
@@ -166,6 +228,11 @@ export default defineComponent({
 					return;
 				}
 
+				if (!autoLoadArmed) {
+					return; // the button stays for a tap; see autoLoadArmed
+				}
+
+				autoLoadArmed = false;
 				onShowMoreClick();
 			});
 		};
@@ -340,6 +407,16 @@ export default defineComponent({
 					skipNextScrollEvent.value = true;
 
 					el.scrollTop = el.scrollHeight - heightOld;
+
+					// Not final until it has survived the scroller's own motion.
+					lastPrependAt = Date.now();
+					pendingAnchor = {heightOld, at: lastPrependAt};
+
+					if (verifyTimer !== null) {
+						clearTimeout(verifyTimer);
+					}
+
+					verifyTimer = setTimeout(verifyAnchor, 50);
 				}
 
 				return;
@@ -389,6 +466,13 @@ export default defineComponent({
 			// We don't want to perform calculations for that
 			if (skipNextScrollEvent.value) {
 				skipNextScrollEvent.value = false;
+
+				// Our own write, or a user scroll coalesced into the same frame:
+				// either way the anchor under verification gets a look.
+				if (pendingAnchor) {
+					verifyAnchor();
+				}
+
 				return;
 			}
 
@@ -399,6 +483,16 @@ export default defineComponent({
 			}
 
 			props.channel.scrolledToBottom = el.scrollHeight - el.scrollTop - el.offsetHeight <= 30;
+
+			// A scroll of the user's own, not the tail of the last prepend's
+			// gesture: the next auto-load may fire.
+			if (!pendingAnchor && Date.now() - lastPrependAt > REARM_AFTER_MS) {
+				autoLoadArmed = true;
+			}
+
+			if (pendingAnchor) {
+				verifyAnchor();
+			}
 		};
 
 		const handleResize = () => {
@@ -441,6 +535,7 @@ export default defineComponent({
 				// Re-add the intersection observer to trigger the check again on channel switch
 				// Otherwise if last channel had the button visible, switching to a new channel won't trigger the history
 				if (historyObserver.value && loadMoreButton.value) {
+					autoLoadArmed = true; // a fresh channel gets its first page unasked
 					historyObserver.value.unobserve(loadMoreButton.value);
 					historyObserver.value.observe(loadMoreButton.value);
 				}
@@ -510,6 +605,10 @@ export default defineComponent({
 		});
 
 		onUnmounted(() => {
+			if (verifyTimer !== null) {
+				clearTimeout(verifyTimer);
+			}
+
 			chat.value?.removeEventListener("touchmove", dismissKeyboard);
 
 			if (historyObserver.value) {
