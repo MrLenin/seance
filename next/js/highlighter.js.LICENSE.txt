@@ -1,0 +1,10 @@
+/*! prismjs 1.30.0 (and the js/prism-*.js grammar chunks) | MIT | Copyright (c) 2012 Lea Verou | https://github.com/PrismJS/prism */
+
+/**
+ * Prism: Lightweight, robust, elegant syntax highlighting
+ *
+ * @license MIT <https://opensource.org/licenses/MIT>
+ * @author Lea Verou <https://lea.verou.me>
+ * @namespace
+ * @public
+ */
