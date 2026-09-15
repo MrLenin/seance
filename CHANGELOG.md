@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 
 - Scrollback: a history page landing while the list is still moving (a fling, a held finger; WebKit drops the scroll position the compensation writes) no longer leaves the view at the top and loads page after page. The compensation is re-checked for 600 ms and re-applied (stopping the momentum) if it was lost, and auto-loading older messages needs a scroll of the user's own after each page.
 - File uploads go to the network's own upload host when the server advertises one (IRCv3 `draft/FILEHOST` ISUPPORT + `draft/authtoken`): a one-shot token from `TOKEN GENERATE FILEHOST`, the file as a bearer-authenticated `POST`, `Location` inserted into the input. Takes precedence over the deploy's `uploads` config for that network; the paperclip appears without any `config.json` entry. See `docs/resources/branding.md` § Uploads.
+- Attention: a hidden page (or one unfocused for a minute) tells the server `AWAY *` (`draft/pre-away`: away for an unspecified reason, per connection, never overriding a `/away` the user set) and clears it on return, so the server's push rule stops treating "spoke a moment ago, then switched apps" as attended. A hidden page no longer marks the open channel read; attention returning does. Another user's `AWAY *` shows as away without a reason.
 
 ## v4.5.0-rc.3 - 2026-05-12 [Pre-release]
 
