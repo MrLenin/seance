@@ -257,11 +257,17 @@ describe("attention and AWAY * (presence.ts)", function () {
 		);
 	});
 
-	it("shows another user's AWAY * as away without a reason", function () {
+	it("shows another user's AWAY * as away without a reason, and says nothing about it", function () {
 		const h = connect();
 		joined(h);
+		h.transport.line(":bob!bob@host PRIVMSG alice :hi");
+		const query = h.client.findChannel("bob")!;
+		const before = query.shared.totalMessages;
 		h.transport.line(":bob!bob@host AWAY :*");
 		const chan = h.client.findChannel("#seance")!;
 		expect(chan.findUser("bob")?.away, "the star is not a reason to display").to.equal("");
+		expect(query.shared.totalMessages, "a star is not news in the query").to.equal(before);
+		h.transport.line(":bob!bob@host AWAY :lunch");
+		expect(query.shared.totalMessages, "a real away is").to.equal(before + 1);
 	});
 });

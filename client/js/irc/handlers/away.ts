@@ -39,7 +39,13 @@ const away: Handler = (client, msg) => {
 			}
 
 			chan.userAway = text;
-			client.pushMessage(chan, {type, time, text, from: chan.userRef(nick)});
+
+			// Someone else's star is their client saying it is not looking
+			// (`draft/pre-away`); the server only shows it to us because we
+			// speak pre-away too. State, not news: no line in the query.
+			if (raw !== AWAY_STAR) {
+				client.pushMessage(chan, {type, time, text, from: chan.userRef(nick)});
+			}
 		} else if (chan.type === ChanType.CHANNEL) {
 			const user = chan.findUser(nick);
 
