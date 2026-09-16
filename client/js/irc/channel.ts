@@ -8,6 +8,7 @@ import {ChanState, ChanType} from "../../../shared/types/chan";
 import type {SharedNetworkChan} from "../../../shared/types/network";
 import type {SharedUser} from "../../../shared/types/user";
 import type {SharedMsg, UserInMessage} from "../../../shared/types/msg";
+import type {HistorySpec} from "./history";
 
 export type Casefold = (s: string) => string;
 
@@ -74,6 +75,8 @@ export class Channel {
 	newestRef: MsgRef | undefined = undefined;
 	/** History has been requested at least once (so `newestRef` is a valid catch-up reference). */
 	historyRequested = false;
+	/** A `more` page the connection died on; asked again once we are back (history.ts). */
+	lostMore: HistorySpec | undefined = undefined;
 	/**
 	 * Read marker (`draft/read-marker`): the newest time we have sent or the
 	 * server has told us was read, on any of the account's sessions. Messages

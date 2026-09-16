@@ -889,6 +889,44 @@ describe("Chat history (history.ts)", function () {
 			return h.sent();
 		}
 
+		it("re-asks for a `more` page that was lost with the connection, once the channel is back", function () {
+			const h = setup();
+			const id = joined(h);
+			h.transport.line(
+				"@msgid=live-7;time=2026-08-25T12:01:00.000Z :bob!bob@host PRIVMSG #seance :hi"
+			);
+			const [{msg}] = msgs(id);
+
+			// The page is asked for; the socket dies before the answer (a phone
+			// coming back from the background scrolls up while the transport
+			// still believes its dead socket is open).
+			socket.emit("more", {target: id, lastId: msg.id, condensed: false});
+			expect(
+				h.sent().some((l) => / CHATHISTORY BEFORE #seance msgid=live-7 100$/.test(l))
+			).to.equal(true);
+			h.transport.closed();
+			expect(mores(id), "the UI is released at once").to.have.length(1);
+			expect(mores(id)[0].messages).to.deep.equal([]);
+			expect(mores(id)[0].moreAvailable, "and keeps its button").to.equal(true);
+
+			// Back: the channel's fill goes out as usual, and the lost page with it.
+			const sent = reconnect(h);
+			const retry = sent.find((l) => / CHATHISTORY BEFORE #seance msgid=live-7 100$/.test(l));
+			expect(retry, `no retry among:\n${sent.join("\n")}`).to.not.equal(undefined);
+
+			// Its answer reaches the UI as the page it asked for (`reconnect`
+			// reset the spy, so this is the first `more` it sees).
+			batch(h, [hist(1), hist(2)], {label: labelOf(retry)});
+			expect(mores(id)).to.have.length(1);
+			expect(mores(id)[0].messages.map((m) => m.text)).to.deep.equal([
+				"message 1",
+				"message 2",
+			]);
+
+			// Once is enough: a further reconnect does not ask again.
+			expect(reconnect(h).some((l) => / CHATHISTORY BEFORE /.test(l))).to.equal(false);
+		});
+
 		it("fills the gap from LATEST back to the newest message seen, appended in order without unread effects", function () {
 			const h = setup();
 			const id = joined(h);

@@ -44,7 +44,7 @@ import {
 	sendMultiline,
 } from "./multiline";
 import {cancelMarkRead, markReadAt, scheduleMarkRead} from "./handlers/markread";
-import {abortHistory} from "./history";
+import {abortHistory, retryLostHistory} from "./history";
 import {
 	cancelCatchup,
 	dropFromCatchup,
@@ -1108,6 +1108,14 @@ export class IrcClient {
 		// on any build (persistence.ts).
 		beginSettling(this);
 
+		// Queries have no JOIN to hang it on: a `more` page the last
+		// connection died on is asked again here (channels: catchup.ts).
+		for (const chan of this.channels) {
+			if (chan.type === ChanType.QUERY) {
+				retryLostHistory(this, chan);
+			}
+		}
+
 		// Opt this connection into session persistence: `PERSISTENCE SET ON`
 		// creates the server's bouncer session and turns its hold on, which
 		// is what draft/webpush triggers fire against. It needs the account
@@ -1878,6 +1886,10 @@ export class IrcClient {
 				// now, the rest one at a time so the server's flood penalty
 				// never queues the user's own lines.
 				enqueueCatchup(this, chan, beforeJoin);
+			} else if (chan) {
+				// The replay fills the gap, not a `more` page the last
+				// connection died on: that one is asked again here.
+				retryLostHistory(this, chan);
 			}
 		}
 	}
