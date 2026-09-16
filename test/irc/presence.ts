@@ -229,6 +229,34 @@ describe("attention and AWAY * (presence.ts)", function () {
 		]);
 	});
 
+	it("prints nothing for the replies to its own AWAY * and AWAY, but still for the user's", function () {
+		const h = connect();
+		const lobby = h.client.lobby;
+		const before = lobby.shared.totalMessages;
+
+		h.client.setAttended(false);
+		h.sent();
+		h.transport.line(":irc.seance.test 306 alice :You have been marked as being away");
+		expect(lobby.shared.totalMessages, "306 for AWAY * is noise").to.equal(before);
+
+		h.client.setAttended(true);
+		h.sent();
+		h.transport.line(":irc.seance.test 305 alice :You are no longer marked as being away");
+		expect(lobby.shared.totalMessages, "305 for the automatic AWAY is noise").to.equal(before);
+
+		// The self away-notify echo of a star (another connection of the
+		// account) is the same signal: silent.
+		h.transport.line(":alice!alice@host AWAY :*");
+		expect(lobby.shared.totalMessages).to.equal(before);
+
+		dispatchInput(h.client, h.client.lobby, "/away lunch");
+		h.sent();
+		h.transport.line(":irc.seance.test 306 alice :You have been marked as being away");
+		expect(lobby.shared.totalMessages, "the user's own /away is acknowledged").to.equal(
+			before + 1
+		);
+	});
+
 	it("shows another user's AWAY * as away without a reason", function () {
 		const h = connect();
 		joined(h);

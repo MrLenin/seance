@@ -42,10 +42,17 @@ export interface PresenceState {
 	userAway: boolean;
 	/** This client sent `AWAY *` and has not cleared it. */
 	starSent: boolean;
+	/**
+	 * Automatic AWAY commands whose replies (RPL_NOWAWAY / RPL_UNAWAY) are
+	 * still to come and should not be shown: switching apps is not news.
+	 * Replies arrive in send order, so a count is enough; a user's own
+	 * `/away` sent after ours is still acknowledged.
+	 */
+	quietReplies: number;
 }
 
 export function initialPresence(): PresenceState {
-	return {attended: true, userAway: false, starSent: false};
+	return {attended: true, userAway: false, starSent: false, quietReplies: 0};
 }
 
 function canSend(client: IrcClient): boolean {
@@ -71,6 +78,7 @@ export function setAttended(client: IrcClient, attended: boolean): void {
 			p.starSent = false;
 
 			if (canSend(client)) {
+				p.quietReplies++;
 				client.send(formatLine({command: "AWAY", params: []}));
 			}
 		}
@@ -96,7 +104,23 @@ export function sendStar(client: IrcClient): void {
 	}
 
 	p.starSent = true;
+	p.quietReplies++;
 	client.send(formatLine({command: "AWAY", params: [AWAY_STAR]}));
+}
+
+/**
+ * Called for each RPL_NOWAWAY / RPL_UNAWAY: true when it answers one of our
+ * automatic AWAY commands and should stay silent.
+ */
+export function takeQuietAwayReply(client: IrcClient): boolean {
+	const p = client.presence;
+
+	if (p.quietReplies > 0) {
+		p.quietReplies--;
+		return true;
+	}
+
+	return false;
 }
 
 /** The user ran `/away` (`away` true) or `/back`. */

@@ -8,6 +8,7 @@
 import {ChanType} from "../../../../shared/types/chan";
 import {MessageType} from "../../../../shared/types/msg";
 import type {Handler} from "../types";
+import {AWAY_STAR, takeQuietAwayReply} from "../presence";
 
 const away: Handler = (client, msg) => {
 	const nick = msg.source?.name ?? "";
@@ -22,7 +23,12 @@ const away: Handler = (client, msg) => {
 	}
 
 	if (client.isSelf(nick)) {
-		client.pushMessage(client.lobby, {type, time, text, self: true}, true);
+		// Our own star (another connection of the account, typically) is the
+		// attention signal, not something to announce.
+		if (raw !== AWAY_STAR) {
+			client.pushMessage(client.lobby, {type, time, text, self: true}, true);
+		}
+
 		return;
 	}
 
@@ -47,6 +53,10 @@ const away: Handler = (client, msg) => {
 /** RPL_UNAWAY / RPL_NOWAWAY: <me> :You are no longer marked as being away… */
 function selfAway(type: MessageType): Handler {
 	return (client, msg) => {
+		if (takeQuietAwayReply(client)) {
+			return;
+		}
+
 		client.pushMessage(
 			client.lobby,
 			{
