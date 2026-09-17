@@ -145,6 +145,33 @@ export class Channel {
 		return ref;
 	}
 
+	/**
+	 * The UI dropped these messages from its buffer (it keeps 100 for a
+	 * channel it is not showing, router.ts / socket-events/msg.ts): forget
+	 * them here too, or every page that brings them back is deduplicated
+	 * away and the channel can never scroll past that point again. They
+	 * are re-remembered, under fresh ids, when a page delivers them.
+	 */
+	forget(ids: number[]): void {
+		for (const id of ids) {
+			const ref = this.msgRefs.get(id);
+
+			if (!ref) {
+				continue;
+			}
+
+			this.msgRefs.delete(id);
+
+			if (ref.msgid && this.idByMsgid.get(ref.msgid) === id) {
+				this.idByMsgid.delete(ref.msgid);
+			}
+
+			if (this.shared.totalMessages > 0) {
+				this.shared.totalMessages--;
+			}
+		}
+	}
+
 	/** Id of the loaded message with `msgid`, if we have shown it. */
 	idOf(msgid: string): number | undefined {
 		return this.idByMsgid.get(msgid);

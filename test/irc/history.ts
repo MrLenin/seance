@@ -909,6 +909,36 @@ describe("Chat history (history.ts)", function () {
 			return h.sent();
 		}
 
+		it("delivers a page again after the UI dropped its rows (history:trim)", function () {
+			const h = setup();
+			const id = joined(h, [hist(1), hist(2), hist(3)]);
+			const chan = h.client.findChannel("#seance")!;
+			const dropped = [chan.idOf("m1")!, chan.idOf("m2")!];
+			const total = chan.shared.totalMessages;
+
+			// The UI keeps only the newest row of the channel (router.ts /
+			// socket-events/msg.ts keep 100): the IRC layer forgets the rest.
+			socket.emit("history:trim", {target: id, ids: dropped});
+			expect(chan.idOf("m1")).to.equal(undefined);
+			expect(chan.msgRefs.has(dropped[0])).to.equal(false);
+			expect(chan.shared.totalMessages).to.equal(total - 2);
+
+			// Scrolling up asks for the page before the row that is left, and
+			// the same two rows come back: shown again, under fresh ids.
+			socket.emit("more", {target: id, lastId: chan.idOf("m3")!, condensed: false});
+			expect(h.sent()[0]).to.match(/ CHATHISTORY BEFORE #seance msgid=m3 100$/);
+			batch(h, [hist(1), hist(2)], {
+				label: labelOf(h.transport.sent[h.transport.sent.length - 1]),
+			});
+			expect(mores(id)).to.have.length(1);
+			expect(mores(id)[0].messages.map((m) => m.text)).to.deep.equal([
+				"message 1",
+				"message 2",
+			]);
+			expect(mores(id)[0].messages.map((m) => m.id)).to.not.include.members(dropped);
+			expect(chan.idOf("m1")).to.equal(mores(id)[0].messages[0].id);
+		});
+
 		it("folds a `more` onto a page already in flight for the channel", function () {
 			const h = setup();
 			const id = joined(h);
