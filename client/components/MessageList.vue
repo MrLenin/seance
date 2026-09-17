@@ -62,6 +62,7 @@ import {condensedTypes} from "../../shared/irc";
 import {ChanState, ChanType} from "../../shared/types/chan";
 import {MessageType, SharedMsg} from "../../shared/types/msg";
 import clipboard from "../js/clipboard";
+import {noteScroll, noteTouch} from "../js/helpers/scrollSettle";
 import socket from "../js/socket";
 import Message from "./Message.vue";
 import MessageCondensed from "./MessageCondensed.vue";
@@ -491,7 +492,13 @@ export default defineComponent({
 		// must not decide whether the list is still pinned.
 		let seenHeight = 0;
 
+		const touchDown = () => noteTouch(true);
+		const touchUp = () => noteTouch(false);
+
 		const handleScroll = () => {
+			// The list is moving: a page arriving now is held (scrollSettle.ts).
+			noteScroll();
+
 			// Setting scrollTop also triggers scroll event
 			// We don't want to perform calculations for that
 			if (skipNextScrollEvent.value) {
@@ -539,6 +546,9 @@ export default defineComponent({
 		onMounted(() => {
 			chat.value?.addEventListener("scroll", handleScroll, {passive: true});
 			chat.value?.addEventListener("touchmove", dismissKeyboard, {passive: true});
+			chat.value?.addEventListener("touchstart", touchDown, {passive: true});
+			chat.value?.addEventListener("touchend", touchUp, {passive: true});
+			chat.value?.addEventListener("touchcancel", touchUp, {passive: true});
 
 			if (chat.value) {
 				resizeObserver.observe(chat.value);
@@ -628,6 +638,10 @@ export default defineComponent({
 			}
 
 			chat.value?.removeEventListener("touchmove", dismissKeyboard);
+			chat.value?.removeEventListener("touchstart", touchDown);
+			chat.value?.removeEventListener("touchend", touchUp);
+			chat.value?.removeEventListener("touchcancel", touchUp);
+			noteTouch(false);
 
 			if (historyObserver.value) {
 				historyObserver.value.disconnect();
