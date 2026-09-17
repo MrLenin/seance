@@ -215,6 +215,13 @@ export function requestMore(client: IrcClient, chan: Channel, lastId: number): b
 	// A fresh page for this channel supersedes one parked by a dead socket.
 	chan.lostMore = undefined;
 
+	// A page is already on its way (the JOIN fill, or a page re-asked after
+	// a reconnect): its answer is the `more` the UI is waiting for. One
+	// prepend in flight per channel; two would answer the same rows twice.
+	if (pendingOf(client).some((r) => r.chan === chan && r.mode === "prepend")) {
+		return true;
+	}
+
 	if (lastId === -1) {
 		return (
 			requestHistory(client, chan, {

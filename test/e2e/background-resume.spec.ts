@@ -135,7 +135,10 @@ async function connectAndSeed(page: Page, wire: string[]): Promise<number[]> {
 		ws.on("framereceived", (f) => {
 			const p = String(f.payload);
 
-			if (/BATCH [+-]|FAIL|chathistory| 001 /i.test(p) && !/PRIVMSG .* :row /.test(p)) {
+			if (
+				/BATCH [+-]|FAIL|chathistory| 001 | JOIN /i.test(p) &&
+				!/PRIVMSG .* :row /.test(p)
+			) {
 				wire.push(`< ${p.slice(0, 120)}`);
 			}
 		});
@@ -303,6 +306,56 @@ test("history paging still works after the socket silently died while hidden (pr
 	await page.waitForSelector("#input:not([disabled])", {timeout: 90_000});
 	await page.waitForTimeout(3000);
 	await pageTwice(page, await rows(page));
+});
+
+test("scrolling up while the reconnect is still in progress loads the page once back", async ({
+	page,
+}) => {
+	test.setTimeout(300_000);
+	const wire: string[] = [];
+	const before = await connectAndSeed(page, wire);
+	await setVisible(page, false);
+	await page.waitForTimeout(1500);
+	const n = await socketCount(page);
+	await deadenSocket(page);
+	await page.waitForTimeout(2000);
+	await setVisible(page, true);
+	// The probe gives up and the transport redials: the button is in view but
+	// disabled (not connected) while the new socket registers.
+	await page.waitForFunction((count) => ((window as any).__ws as WebSocket[]).length > count, n, {
+		timeout: 120_000,
+	});
+	await scrollTo(page, 0);
+	await page.waitForTimeout(300);
+	await page.waitForSelector("#input:not([disabled])", {timeout: 90_000});
+
+	// The user asked; once the channel is back the page must come without
+	// another gesture (at the top there is no scroll left to give).
+	const dump = async () =>
+		page.evaluate(() => {
+			const el = document.querySelector(".chat") as HTMLElement;
+			const b = document.querySelector(".show-more button") as HTMLButtonElement | null;
+			const sm = document.querySelector(".show-more") as HTMLElement | null;
+			return JSON.stringify({
+				scrollTop: el.scrollTop,
+				scrollHeight: el.scrollHeight,
+				clientHeight: el.clientHeight,
+				showMore: sm ? getComputedStyle(sm).display : "absent",
+				button: b ? {disabled: b.disabled, text: b.innerText} : null,
+				input: (document.querySelector("#input") as HTMLInputElement).disabled,
+				msgs: document.querySelectorAll("#chat-container .msg").length,
+			});
+		});
+	await expect
+		.poll(async () => (await rows(page))[0], {
+			timeout: 30_000,
+			message: `no page after the reconnect\n${await dump()}\n${wire.join("\n")}`,
+		})
+		.toBeLessThan(before[0]);
+	await page.waitForTimeout(1500);
+	const after = await rows(page);
+	expectPaged(after, before, "after reconnect");
+	await pageTwice(page, after);
 });
 
 test("scrolling up right after resume, over three background cycles, keeps paging alive", async ({
