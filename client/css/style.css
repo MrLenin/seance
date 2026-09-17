@@ -295,6 +295,9 @@ button {
 code,
 pre,
 #chat .msg[data-type="monospace_block"] .text,
+/* Unhandled numerics are server-formatted for a fixed-width column
+   (/map trees, /stats tables): keep their spacing honest. */
+#chat .msg[data-type="unhandled"] .content,
 .irc-monospace,
 textarea#user-specified-css-input {
 	font-family: Consolas, Menlo, Monaco, "Lucida Console", "DejaVu Sans Mono", "Courier New", monospace;
@@ -761,6 +764,14 @@ p {
 	 * viewport, which iOS never shrinks for the keyboard, they would outgrow
 	 * the app and the sidebar's footer would sit below the screen. */
 	position: relative;
+
+	/* Its height is the visible band (--viewport-height on touch devices),
+	 * which no media query can see: iOS keeps the layout viewport at the
+	 * screen's size while the keyboard is up. A container query can. */
+	/* stylelint-disable-next-line property-no-unknown */
+	container-type: size;
+	/* stylelint-disable-next-line property-no-unknown */
+	container-name: viewport;
 }
 
 #form button,
@@ -1393,15 +1404,10 @@ so the toolbar has one weight; green is what marks a subscribed bell. */
 	font-size: 1rem;
 }
 
-/* A size container, so the settings menu can ask whether the window is wide
- * enough for it to sit beside the content (Navigation.vue) in rem, which a
- * media query cannot see. */
-#settings {
-	/* stylelint-disable-next-line property-no-unknown */
-	container-type: inline-size;
-	/* stylelint-disable-next-line property-no-unknown */
-	container-name: settings;
-}
+/* The `settings` size container is the modal pane itself
+ * (Windows/Settings.vue .settings-modal): the tab strip asks it whether
+ * there is room for labels (Navigation.vue) in rem, which a media query
+ * cannot see. */
 
 /* Native checkboxes and radios do not follow the font; size them off it so
  * the big scales get a target that matches their label. */
@@ -1503,6 +1509,39 @@ textarea.input {
 
 #chat .header {
 	border-bottom: 1px solid #e7e7e7;
+}
+
+/* Compose mode. A phone in landscape has ~430px; the keyboard and Safari's
+ * form bar take ~250 of them, so the header and the composer leave a single
+ * line of scrollback. While the composer has the caret in a band that short
+ * the header goes: the placeholder names the channel, and the keyboard's Done
+ * brings the header (and its buttons) back. Gated on the caret, not on the
+ * height alone, or a landscape phone at a large font step would lose the
+ * header — and the way to the sidebar and the menu — for good. 18rem is
+ * above what any keyboard leaves and below any phone's screen in portrait
+ * with the keyboard up (iPhone SE: ~400px). */
+/* stylelint-disable-next-line at-rule-no-unknown */
+@container viewport (max-height: 18rem) {
+	body:has(#form #input:focus) #chat .header {
+		display: none;
+	}
+
+	/* The "alice is typing…" strip shares the composer's row instead of
+	 * taking one of its own: between the text and the buttons, a third of
+	 * the row at most, ellipsised. Its reserved (empty) form has no width,
+	 * so nothing bounces either way. */
+	body:has(#form #input:focus) #form .typing-indicator {
+		flex: 0 1 auto;
+		order: 1;
+		max-width: 33%;
+		min-width: 0;
+		margin: 0 0.25rem;
+		align-self: center;
+	}
+
+	body:has(#form #input:focus) #form > .tooltipped {
+		order: 2;
+	}
 }
 
 /* A dial or a reconnect is a spinner in the header, not a banner */
@@ -2982,6 +3021,59 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	justify-content: space-between;
 }
 
+/* A newer build's service worker is waiting (Help.vue): one quiet strip,
+ * accent-edged like the composer's status bars, with a small solid Reload. */
+#help .update-banner {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin: 0 0 1rem;
+	padding: 0.5rem 0.75rem;
+	border-left: 3px solid var(--button-color);
+	border-radius: 0 3px 3px 0;
+	background: rgb(0 0 0 / 4%);
+}
+
+#help .update-banner-icon::before {
+	content: "\f0aa"; /* https://fontawesome.com/icons/arrow-circle-up?style=solid */
+	display: inline-block;
+	font: normal normal normal 1em/1 FontAwesome;
+	color: var(--button-color);
+}
+
+#help .update-banner-text {
+	flex: 1 1 auto;
+	min-width: 0;
+	font-weight: bold;
+}
+
+#help .update-banner-reload {
+	flex: 0 0 auto;
+	padding: 0.3em 1em;
+	border: 0;
+	border-radius: 3px;
+	background: var(--button-color);
+	color: var(--button-text-color-hover);
+	font: inherit;
+	font-size: 0.875rem;
+	font-weight: bold;
+	cursor: pointer;
+	transition: opacity 0.2s, box-shadow 0.2s;
+}
+
+#help .update-banner-reload:hover {
+	opacity: 0.85;
+}
+
+#help .update-banner-reload:focus-visible {
+	outline: 0;
+	box-shadow: 0 0 0 3px rgb(132 206 136 / 50%);
+}
+
+#help .update-banner-reload:active {
+	opacity: 0.7;
+}
+
 #help .help-item {
 	display: table-row;
 	font-size: 1rem;
@@ -3006,19 +3098,36 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	margin-bottom: 0;
 }
 
+/* Each dt/dd pair is one row (whois.vue wraps them in divs). The label is
+ * lifted out of the content column into the gutter — absolutely positioned
+ * left of the separator bar, right-aligned against it like a nick — which
+ * the row leaves empty below its first line. `1rem + 1px` retraces the
+ * content padding (0.5rem), the separator border (1px) and the gutter's own
+ * 0.5rem of padding, so the label's right edge lands where a nick ends. A
+ * long label runs on into the (equally empty) time column. */
 .whois {
-	display: grid;
-	grid-template-columns: max-content auto;
 	margin: 0;
 }
 
-.whois dt {
-	grid-column-start: 1;
-	margin-right: 20px;
+.whois > div {
+	position: relative;
+}
+
+#chat .whois dt {
+	position: absolute;
+	top: 0;
+	right: calc(100% + 1rem + 1px);
+	white-space: nowrap;
+	color: var(--body-color-muted);
 }
 
 .whois dd {
-	grid-column-start: 2;
+	margin: 0;
+}
+
+/* The labels escape the content column, so it must not clip. */
+#chat .msg[data-type="whois"] .content {
+	overflow: visible;
 }
 
 .changelog-text {
@@ -3130,15 +3239,22 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
  *
  * iOS only: Android's navigation bar is outside the browser viewport, so the
  * strip would be dead space there. `-webkit-touch-callout` exists in WebKit
- * alone, and every iOS browser is WebKit. */
-@media (hover: none) and (pointer: coarse) {
+ * alone, and every iOS browser is WebKit.
+ *
+ * Portrait only: in landscape the indicator is thinner and the composer is
+ * tappable without the strip (phone-verified 2026-09-11), so the strip would
+ * only take rows from a viewport that has few to spare. */
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
 	@supports (-webkit-touch-callout: none) {
 		#form {
 			padding-bottom: 34px;
 		}
 
-		/* The keyboard covers the indicator while a field is focused. */
-		body:has(#form #input:focus) #form {
+		/* The keyboard covers the indicator while it is up. That is the
+		 * viewport measurement in helpers/viewport.ts, not the caret: iOS's
+		 * shake-to-undo alert gives the composer its focus back with the
+		 * keyboard down, and a rule on :focus left it in the indicator. */
+		html[data-keyboard="up"] #form {
 			padding-bottom: 0.375rem;
 		}
 	}
@@ -3184,7 +3300,12 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	margin: 5px;
 	padding: 0;
 	resize: none;
-	flex: 1 0 auto;
+
+	/* Fill what the buttons leave, never the textarea's own 20-column width:
+	   at large font steps on a phone that is wider than the form, and iOS
+	   then pans the page to the caret. */
+	flex: 1 1 0;
+	min-width: 0;
 	align-self: center;
 	touch-action: pan-y;
 	caret-color: var(--link-color);
@@ -3857,7 +3978,8 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	font-size: 0.8125rem;
 }
 
-@media (max-width: 768px) {
+/* The phone layout; the same list as PHONE_LAYOUT_QUERY in helpers/device.ts. */
+@media (max-width: 768px), (max-height: 500px) and (hover: none) and (pointer: coarse) {
 	/**
 	  * TODO Replace this with `@media (hover: hover)` when Firefox supports it
 	  * See:
@@ -4023,6 +4145,18 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	#chat .condensed-summary .time,
 	#chat .condensed-summary .from {
 		display: none;
+	}
+
+	/* Inline flow has no gutter to project the whois labels into: back to
+	 * "Label: value" run-in lines. */
+	#chat .whois dt {
+		position: static;
+		display: inline;
+		white-space: normal;
+	}
+
+	#chat .whois dd {
+		display: inline;
 	}
 }
 
@@ -4201,6 +4335,7 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 #chat .msg[data-type="message"] .content,
 #chat .msg[data-type="monospace_block"] .content,
 #chat .msg[data-type="notice"] .content,
+#chat .msg[data-type="unhandled"] .content,
 #chat .ctcp-message,
 #chat .part-reason,
 #chat .quit-reason,
