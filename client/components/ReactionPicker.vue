@@ -681,8 +681,13 @@ export default defineComponent({
 		};
 
 		// A phone gets the sheet at the bottom of the screen; there is no room
-		// for a popover once the on-screen keyboard is up.
-		const sheetQuery = window.matchMedia("(max-width: 479px)");
+		// for a popover once the on-screen keyboard is up. Sideways too: the
+		// second clause is the landscape-phone half of `PHONE_LAYOUT_QUERY`
+		// (helpers/device.ts) — a touch device under 500px tall with the
+		// keyboard up keeps ~190px, and a 21rem popover there showed one row.
+		const sheetQuery = window.matchMedia(
+			"(max-width: 479px), (max-height: 500px) and (hover: none) and (pointer: coarse)"
+		);
 		const sheet = ref(sheetQuery.matches);
 
 		const onSheetChange = (e: MediaQueryListEvent) => {

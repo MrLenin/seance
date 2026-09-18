@@ -153,6 +153,10 @@ async function press(page, key, code = key) {
 const keyCode = (key) =>
 	({ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40, Escape: 27}[key] ?? 0);
 
+const KEYBOARD_UP = (px) =>
+	`document.documentElement.style.setProperty("--viewport-height", "${px}px"); document.documentElement.dataset.keyboard = "up"`;
+const KEYBOARD_DOWN = `document.documentElement.style.removeProperty("--viewport-height"); delete document.documentElement.dataset.keyboard`;
+
 export default async function run(page) {
 	await page.goto(page.url, {waitForSelector: "#connect form"});
 	await page.evaluate(`window.localStorage.removeItem("thelounge.reactions.recent")`);
@@ -485,7 +489,7 @@ export default async function run(page) {
 	// the band as `--viewport-height`; a headless Chromium has no keyboard, so
 	// the scenario publishes one of 480px by hand and expects the sheet to
 	// move up out of the covered part and shrink to 70% of what is left.
-	await page.evaluate(`document.documentElement.style.setProperty("--viewport-height", "480px")`);
+	await page.evaluate(KEYBOARD_UP(480));
 	await page.sleep(200);
 	const raised = await page.rect(PICKER);
 	await page.check(
@@ -493,7 +497,59 @@ export default async function run(page) {
 		Math.round(raised.y + raised.height) === 480 && Math.round(raised.height) === 336
 	);
 	await page.screenshot("8b-sheet-keyboard", {selector: "body", pad: 0});
-	await page.evaluate(`document.documentElement.style.removeProperty("--viewport-height")`);
+	await page.evaluate(KEYBOARD_DOWN);
+	await press(page, "Escape");
+	await page.sleep(200);
+
+	// A phone turned sideways is 812px and up wide but under 500px tall, and
+	// with the keyboard up it keeps ~190px: the popover showed one row of
+	// emoji there, so a touch device that short gets the sheet as well (the
+	// landscape clause of PHONE_LAYOUT_QUERY). Touch emulation is what makes
+	// `(hover: none) and (pointer: coarse)` true.
+	await page.send("Emulation.setDeviceMetricsOverride", {
+		width: 844,
+		height: 390,
+		deviceScaleFactor: 1,
+		mobile: true,
+	});
+	await page.send("Emulation.setTouchEmulationEnabled", {enabled: true, maxTouchPoints: 5});
+	await page.sleep(400);
+	await page.evaluate(`document.querySelector("#sidebar")?.classList.remove("open")`);
+	await page.evaluate(
+		`document.querySelector(${JSON.stringify(MSG)}).scrollIntoView({block: "center"})`
+	);
+	await page.sleep(300);
+	await page.click(`${MSG} .msg-reaction-add`);
+	await page.waitFor(`document.querySelector(${JSON.stringify(PICKER)})`, {
+		label: "the picker on a landscape phone",
+	});
+	// The keyboard comes up once the search field is tapped, after the open.
+	// The sheet then takes the whole band and drops its tab strip, which is
+	// what leaves room for two rows of emoji.
+	await page.evaluate(KEYBOARD_UP(190));
+	await page.sleep(300);
+
+	const landscape = await page.rect(PICKER);
+	const landscapeList = await page.rect(`${PICKER} .reaction-picker-list`);
+	const option = await page.rect(`${PICKER} .reaction-picker-option`);
+	await page.check(
+		`a landscape phone gets the sheet above the keyboard (${JSON.stringify(
+			landscape
+		)}, list ${Math.round(landscapeList.height)}px, option ${Math.round(option.height)}px)`,
+		(await page.evaluate(
+			`document.querySelector(${JSON.stringify(PICKER)}).classList.contains("sheet")`
+		)) &&
+			landscape.x === 0 &&
+			Math.round(landscape.width) === 844 &&
+			Math.round(landscape.y) === 0 &&
+			Math.round(landscape.y + landscape.height) === 190 &&
+			(await page.count(`${PICKER} .reaction-picker-tabs`)) === 1 &&
+			(await page.rect(`${PICKER} .reaction-picker-tabs`)).height === 0 &&
+			landscapeList.height >= 2 * option.height
+	);
+	await page.screenshot("8c-sheet-landscape", {selector: "html", pad: 0});
+	await page.evaluate(KEYBOARD_DOWN);
+	await page.send("Emulation.setTouchEmulationEnabled", {enabled: false, maxTouchPoints: 1});
 	await page.send("Emulation.clearDeviceMetricsOverride");
 	await page.sleep(400);
 
