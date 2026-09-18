@@ -1,5 +1,5 @@
 <template>
-	<div ref="chat" class="chat" tabindex="-1">
+	<div ref="chat" class="chat" :class="{selecting}" tabindex="-1">
 		<div v-show="channel.moreHistoryAvailable" class="show-more">
 			<button
 				ref="loadMoreButton"
@@ -17,6 +17,7 @@
 			aria-live="polite"
 			aria-relevant="additions"
 			@copy="onCopy"
+			@pointerdown="onPointerDown"
 		>
 			<template v-for="(message, id) in condensedMessages">
 				<DateMarker
@@ -80,6 +81,9 @@ import {
 } from "vue";
 import {useStore} from "../js/store";
 import {ClientChan, ClientMessage, ClientNetwork, ClientLinkPreview} from "../js/types";
+
+/** A pressed pointer that travels this far is dragging out a selection. */
+const DRAG_SLOP_PX = 4;
 
 type CondensedMessageContainer = {
 	type: "condensed";
@@ -449,6 +453,50 @@ export default defineComponent({
 			return !!selection && !selection.isCollapsed;
 		};
 
+		// --- a drag is a text selection: the action toolbar stands down ---
+		//
+		// `selecting` is a class on the root while the primary mouse button
+		// is down and the pointer has moved: style.css hides every row's
+		// toolbar under it, so the bar does not pop over the rows the drag
+		// crosses. Only a pointer that started on message text counts; a
+		// press on a button or a link is a click, and touch scrolls.
+		const selecting = ref(false);
+		let dragStart: {x: number; y: number} | null = null;
+
+		const onDragMove = (e: PointerEvent) => {
+			if (
+				dragStart &&
+				!selecting.value &&
+				(Math.abs(e.clientX - dragStart.x) > DRAG_SLOP_PX ||
+					Math.abs(e.clientY - dragStart.y) > DRAG_SLOP_PX)
+			) {
+				selecting.value = true;
+			}
+		};
+
+		const endDrag = () => {
+			dragStart = null;
+			selecting.value = false;
+			window.removeEventListener("pointermove", onDragMove);
+			window.removeEventListener("pointerup", endDrag);
+			window.removeEventListener("pointercancel", endDrag);
+		};
+
+		const onPointerDown = (e: PointerEvent) => {
+			if (e.pointerType !== "mouse" || e.button !== 0) {
+				return;
+			}
+
+			if ((e.target as HTMLElement | null)?.closest("a, button, .msg-actions")) {
+				return;
+			}
+
+			dragStart = {x: e.clientX, y: e.clientY};
+			window.addEventListener("pointermove", onDragMove);
+			window.addEventListener("pointerup", endDrag);
+			window.addEventListener("pointercancel", endDrag);
+		};
+
 		/**
 		 * A finger drag on the scrollback puts the keyboard away, like a native
 		 * scroll view's `keyboardDismissMode = .onDrag`. On `touchmove`, not
@@ -592,6 +640,7 @@ export default defineComponent({
 		onBeforeUnmount(() => {
 			resizeObserver.disconnect();
 			chat.value?.removeEventListener("scroll", handleScroll);
+			endDrag();
 		});
 
 		onUnmounted(() => {
@@ -619,6 +668,8 @@ export default defineComponent({
 			isPreviousSource,
 			jumpToBottom,
 			onLinkPreviewToggle,
+			selecting,
+			onPointerDown,
 		};
 	},
 });

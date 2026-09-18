@@ -11,9 +11,7 @@
 			aria-label="Reply"
 			title="Reply"
 			@click="reply"
-		>
-			↩
-		</button>
+		/>
 		<button
 			ref="reactButton"
 			type="button"
@@ -24,19 +22,25 @@
 			@mouseenter="preloadEmoji"
 			@mousedown.stop
 			@click="pickerOpen = !pickerOpen"
-		>
-			😀
-		</button>
+		/>
+		<button
+			v-if="canCopyText"
+			type="button"
+			class="msg-action msg-action-copy-text"
+			:class="{copied: copied === 'text'}"
+			:aria-label="copied === 'text' ? 'Copied' : 'Copy text'"
+			:title="copied === 'text' ? 'Copied' : 'Copy text'"
+			@click.stop="copyText"
+		/>
 		<button
 			v-if="codeBlocks.length > 0"
 			type="button"
 			class="msg-action msg-action-copy"
-			:aria-label="copied ? 'Copied' : 'Copy code'"
-			:title="copied ? 'Copied' : 'Copy code'"
+			:class="{copied: copied === 'code'}"
+			:aria-label="copied === 'code' ? 'Copied' : 'Copy code'"
+			:title="copied === 'code' ? 'Copied' : 'Copy code'"
 			@click.stop="copyCode"
-		>
-			{{ copied ? "✓" : "⧉" }}
-		</button>
+		/>
 		<button
 			v-if="canEdit"
 			type="button"
@@ -44,19 +48,17 @@
 			aria-label="Edit"
 			title="Edit"
 			@click="edit"
-		>
-			✎
-		</button>
-		<button
-			v-if="canDelete"
-			type="button"
-			class="msg-action msg-action-delete"
-			aria-label="Delete"
-			title="Delete"
-			@click="remove"
-		>
-			✕
-		</button>
+		/>
+		<template v-if="canDelete">
+			<span class="msg-action-divider" role="separator" aria-orientation="vertical" />
+			<button
+				type="button"
+				class="msg-action msg-action-delete"
+				aria-label="Delete message"
+				title="Delete message"
+				@click="remove"
+			/>
+		</template>
 		<ReactionPicker
 			v-if="pickerOpen"
 			:anchor="reactButton"
@@ -77,6 +79,7 @@ import {useStore} from "../js/store";
 import {startEdit, startReply} from "../js/helpers/compose";
 import {myReactions} from "../js/helpers/messageUpdates";
 import {loadEmojiCatalog} from "../js/helpers/emoji";
+import {hasVirtualKeyboard} from "../js/helpers/device";
 import {ChanType} from "../../shared/types/chan";
 import {MessageType} from "../../shared/types/msg";
 import type {ClientChan, ClientMessage, ClientNetwork} from "../js/types";
@@ -119,11 +122,12 @@ export default defineComponent({
 			return codeBlocksOf(layout(text, {markdown: true}));
 		});
 
-		const copied = ref(false);
+		// Which copy button is saying "Copied" right now, if any.
+		const copied = ref<"text" | "code" | null>(null);
 		let copiedTimer: ReturnType<typeof setTimeout> | undefined;
 
 		const clearCopied = () => {
-			copied.value = false;
+			copied.value = null;
 
 			if (copiedTimer !== undefined) {
 				clearTimeout(copiedTimer);
@@ -133,18 +137,28 @@ export default defineComponent({
 
 		onUnmounted(clearCopied);
 
-		// Several blocks are one copy, a blank line apart: they were blocks of
-		// their own, and a copy that ran them together would be a different
-		// program. A copy that did not happen says nothing and changes nothing.
-		const copyCode = async () => {
-			if (!(await writeClipboard(codeBlocks.value.join("\n\n")))) {
+		// A copy that did not happen says nothing and changes nothing.
+		const copy = async (what: "text" | "code", text: string) => {
+			if (!(await writeClipboard(text))) {
 				return;
 			}
 
 			clearCopied();
-			copied.value = true;
+			copied.value = what;
 			copiedTimer = setTimeout(clearCopied, COPIED_MS);
 		};
+
+		// Several blocks are one copy, a blank line apart: they were blocks of
+		// their own, and a copy that ran them together would be a different
+		// program.
+		const copyCode = () => copy("code", codeBlocks.value.join("\n\n"));
+
+		// On a touch device the message text is not selectable (the long press
+		// that would select it opens this toolbar instead — see Message.vue),
+		// so the toolbar is how the text is copied there. A pointer device
+		// selects and copies as it always has, and does not get the button.
+		const canCopyText = hasVirtualKeyboard() && !!props.message.text;
+		const copyText = () => copy("text", props.message.text ?? "");
 
 		// Only plain text can be edited (the IRC layer resends it tagged).
 		const canEdit = computed(
@@ -220,12 +234,14 @@ export default defineComponent({
 			canDelete,
 			codeBlocks,
 			copied,
+			canCopyText,
 			reply,
 			edit,
 			react,
 			preloadEmoji,
 			remove,
 			copyCode,
+			copyText,
 		};
 	},
 });
