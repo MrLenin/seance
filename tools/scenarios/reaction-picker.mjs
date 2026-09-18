@@ -490,7 +490,7 @@ export default async function run(page) {
 	const raised = await page.rect(PICKER);
 	await page.check(
 		`the sheet keeps above the keyboard (${JSON.stringify(raised)})`,
-		Math.round(raised.y + raised.height) === 480 && raised.height <= 480 * 0.7 + 1
+		Math.round(raised.y + raised.height) === 480 && Math.round(raised.height) === 336
 	);
 	await page.screenshot("8b-sheet-keyboard", {selector: "body", pad: 0});
 	await page.evaluate(`document.documentElement.style.removeProperty("--viewport-height")`);
