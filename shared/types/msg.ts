@@ -75,12 +75,21 @@ export type MsgRedaction = {
 	time: Date;
 };
 
+/** The excerpt a reply shows of its parent, or the fact that there is none to show. */
+export type ReplyQuote = {nick: string; text: string} | {unavailable: true};
+
 export type SharedMsg = {
 	from?: UserInMessage;
 	id: number;
 	msgid?: string;
 	/** msgid this message replies to (`+reply` / `+draft/reply`); may not be loaded. */
 	replyTo?: string;
+	/**
+	 * What the parent said, resolved by the IRC layer (docs/projects/reply-quote.md):
+	 * copied when the parent was known at arrival, or fetched on demand
+	 * (`msg:quote`). `{unavailable: true}` when the server has nothing for it.
+	 */
+	replyQuote?: ReplyQuote;
 	/** Aggregated `+draft/react` reactions, in first-seen order. */
 	reactions?: MsgReaction[];
 	/** Set when a REDACT for this message arrived; rendered as a placeholder. */

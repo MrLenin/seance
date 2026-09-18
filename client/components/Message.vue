@@ -50,6 +50,9 @@
 						><span class="msg-reply-nick">{{ quote.nick }}</span
 						>&#32;<span class="msg-reply-text">{{ quote.text }}</span></template
 					>
+					<span v-else-if="quoteUnavailable" class="msg-reply-text"
+						>(message not available)</span
+					>
 					<span v-else class="msg-reply-text">(unknown message)</span>
 				</button>
 				<StatusmsgMarker :group="message.statusmsgGroup" />
@@ -133,6 +136,9 @@
 						><span class="msg-reply-nick">{{ quote.nick }}</span
 						>&#32;<span class="msg-reply-text">{{ quote.text }}</span></template
 					>
+					<span v-else-if="quoteUnavailable" class="msg-reply-text"
+						>(message not available)</span
+					>
 					<span v-else class="msg-reply-text">(unknown message)</span>
 				</button>
 				<StatusmsgMarker :group="message.statusmsgGroup" />
@@ -178,7 +184,7 @@
 </template>
 
 <script lang="ts">
-import {computed, defineComponent, PropType, ref} from "vue";
+import {computed, defineComponent, onMounted, PropType, ref} from "vue";
 import dayjs from "dayjs";
 
 import constants from "../js/constants";
@@ -191,6 +197,7 @@ import StatusmsgMarker from "./StatusmsgMarker.vue";
 import MessageActions from "./MessageActions.vue";
 import MessageReactions from "./MessageReactions.vue";
 import {replyQuote} from "../js/helpers/messageUpdates";
+import socket from "../js/socket";
 import {MessageType} from "../../shared/types/msg";
 
 import type {ClientChan, ClientMessage, ClientNetwork} from "../js/types";
@@ -279,23 +286,59 @@ export default defineComponent({
 
 		// --- replies, reactions, deletion, edits (bus-contract §1.4) ---
 
-		// Parent of a reply, resolved from the loaded messages by msgid.
-		const quote = computed(() => {
+		// Parent of a reply: the loaded message when it is in the buffer (its
+		// id makes the quote a jump), else the excerpt the IRC layer copied or
+		// fetched (docs/projects/reply-quote.md), which has no message to
+		// jump to.
+		const quote = computed<{nick: string; text: string; id?: number} | undefined>(() => {
 			if (!props.message.replyTo || !props.channel) {
 				return undefined;
 			}
 
-			return replyQuote(props.channel.messages, props.message.replyTo);
+			const loaded = replyQuote(props.channel.messages, props.message.replyTo);
+
+			if (loaded) {
+				return loaded;
+			}
+
+			const copied = props.message.replyQuote;
+
+			if (copied && !("unavailable" in copied)) {
+				return {nick: copied.nick, text: copied.text};
+			}
+
+			return undefined;
+		});
+
+		/** The server has nothing for the parent (presence filter, never stored). */
+		const quoteUnavailable = computed(() => {
+			const copied = props.message.replyQuote;
+			return !quote.value && !!copied && "unavailable" in copied;
 		});
 
 		const quoteLabel = computed(() =>
 			quote.value
-				? `Replying to ${quote.value.nick}: ${quote.value.text}. Jump to that message.`
+				? `Replying to ${quote.value.nick}: ${quote.value.text}.${
+						quote.value.id !== undefined ? " Jump to that message." : ""
+				  }`
+				: quoteUnavailable.value
+				? "Replying to a message that is not available"
 				: "Replying to a message that is not loaded"
 		);
 
+		// Rendered with nothing to show: ask the IRC layer for the parent. It
+		// answers from its cache at once when it can, so re-renders are cheap.
+		onMounted(() => {
+			if (props.message.replyTo && props.channel && !quote.value && !quoteUnavailable.value) {
+				socket.emit("quote:fetch", {
+					target: props.channel.id,
+					msgid: props.message.replyTo,
+				});
+			}
+		});
+
 		const jumpToParent = () => {
-			if (!quote.value) {
+			if (!quote.value || quote.value.id === undefined) {
 				return;
 			}
 
@@ -366,6 +409,7 @@ export default defineComponent({
 			quote,
 			quoteLabel,
 			jumpToParent,
+			quoteUnavailable,
 			revealed,
 			redactedLabel,
 			hideRevealed,

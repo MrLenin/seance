@@ -23,6 +23,22 @@ function lookup(chan: number, id: number) {
 	return findMessageById(target.channel.messages, id);
 }
 
+// The parent of every reply naming `msgid` is now known (or known to be
+// missing): the quote no longer depends on the parent being in the buffer.
+socket.on("msg:quote", function (data) {
+	const target = store.getters.findChannel(data.chan);
+
+	if (!target) {
+		return;
+	}
+
+	for (const message of target.channel.messages) {
+		if (message.replyTo === data.msgid) {
+			message.replyQuote = data.quote;
+		}
+	}
+});
+
 socket.on("msg:react", function (data) {
 	const message = lookup(data.chan, data.id);
 

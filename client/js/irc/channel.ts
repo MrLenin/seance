@@ -7,8 +7,9 @@
 import {ChanState, ChanType} from "../../../shared/types/chan";
 import type {SharedNetworkChan} from "../../../shared/types/network";
 import type {SharedUser} from "../../../shared/types/user";
-import type {SharedMsg, UserInMessage} from "../../../shared/types/msg";
+import type {ReplyQuote, SharedMsg, UserInMessage} from "../../../shared/types/msg";
 import type {HistorySpec} from "./history";
+import {QUOTE_CACHE_MAX, excerpt} from "./quotes";
 
 export type Casefold = (s: string) => string;
 
@@ -77,6 +78,12 @@ export class Channel {
 	historyRequested = false;
 	/** A `more` page the connection died on; asked again once we are back (history.ts). */
 	lostMore: HistorySpec | undefined = undefined;
+	/**
+	 * What each message said, by msgid, for the replies to it (quotes.ts):
+	 * an excerpt of every message handed to the UI, plus the answers to
+	 * quote fetches. Bounded FIFO; survives the UI's trims on purpose.
+	 */
+	private readonly quotes = new Map<string, ReplyQuote>();
 	/**
 	 * Read marker (`draft/read-marker`): the newest time we have sent or the
 	 * server has told us was read, on any of the account's sessions. Messages
@@ -170,6 +177,33 @@ export class Channel {
 				this.shared.totalMessages--;
 			}
 		}
+	}
+
+	/** Keep what `msgid` said, for the replies to it. */
+	noteQuote(msgid: string, nick: string, text: string): void {
+		this.noteQuoteResolved(msgid, {nick, text: excerpt(text)});
+	}
+
+	/** Keep a quote as resolved by a fetch (a found parent, or its absence). */
+	noteQuoteResolved(msgid: string, quote: ReplyQuote): void {
+		if (this.quotes.has(msgid)) {
+			this.quotes.delete(msgid); // re-insert as newest
+		}
+
+		this.quotes.set(msgid, quote);
+
+		if (this.quotes.size > QUOTE_CACHE_MAX) {
+			const oldest = this.quotes.keys().next().value;
+
+			if (oldest !== undefined) {
+				this.quotes.delete(oldest);
+			}
+		}
+	}
+
+	/** The quote for a reply to `msgid`, if known. */
+	quoteOf(msgid: string): ReplyQuote | undefined {
+		return this.quotes.get(msgid);
 	}
 
 	/** Id of the loaded message with `msgid`, if we have shown it. */

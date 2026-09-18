@@ -174,6 +174,8 @@ function handleMessage(client: IrcClient, msg: IrcMessage, baseType: MessageType
 
 	if (msgid) {
 		message.msgid = msgid;
+		// For the replies to this message, whether or not the UI keeps it.
+		chan.noteQuote(msgid, nick, text);
 	}
 
 	// `account-tag`: the sender's services account, when logged in. Trusting
@@ -200,6 +202,11 @@ function handleMessage(client: IrcClient, msg: IrcMessage, baseType: MessageType
 
 	if (replyTo) {
 		message.replyTo = replyTo;
+		const quote = chan.quoteOf(replyTo);
+
+		if (quote) {
+			message.replyQuote = quote; // survives the UI's trims
+		}
 	}
 
 	if (editOf) {

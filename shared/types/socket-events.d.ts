@@ -1,7 +1,7 @@
 import {SharedMention} from "./mention";
 import {ChanState, SharedChan} from "./chan";
 import {SharedNetwork, SharedServerOptions} from "./network";
-import {SharedMsg, LinkPreview, TypingState} from "./msg";
+import {SharedMsg, LinkPreview, TypingState, ReplyQuote} from "./msg";
 import {SharedUser} from "./user";
 import {SharedChangelogData} from "./changelog";
 import {SharedConfiguration, LockedSharedConfiguration} from "./config";
@@ -130,6 +130,8 @@ interface ServerToClientEvents {
 	 * follows as its own `msg`.
 	 */
 	"msg:settled": EventHandler<{chan: number; id: number}>;
+	/** The parent of the replies naming `msgid` in `chan`, resolved (docs/projects/reply-quote.md). */
+	"msg:quote": EventHandler<{chan: number; msgid: string; quote: ReplyQuote}>;
 	/** Someone else's `+typing` TAGMSG in a loaded channel/query (never our own). */
 	typing: EventHandler<{chan: number; nick: string; state: TypingState}>;
 
@@ -264,6 +266,8 @@ interface ClientToServerEvents {
 	more: EventHandler<{target: number; lastId: number; condensed: boolean}>;
 	/** The UI dropped these messages from a channel's buffer (see bus-contract § 2). */
 	"history:trim": EventHandler<{target: number; ids: number[]}>;
+	/** A rendered reply has no quote for its parent: resolve it (docs/projects/reply-quote.md). */
+	"quote:fetch": EventHandler<{target: number; msgid: string}>;
 
 	"msg:preview:toggle": EventHandler<{
 		target: number;

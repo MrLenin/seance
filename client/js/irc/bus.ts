@@ -7,6 +7,7 @@
 
 import type {EventBus} from "../socket";
 import type {IrcClient} from "./client";
+import {requestQuote} from "./quotes";
 import {requestMore} from "./history";
 import * as saved from "./saved-networks";
 import type {ConnectOptions} from "./types";
@@ -189,6 +190,15 @@ export function registerBusHandlers(bus: EventBus, registry: ClientRegistry): vo
 			messages: [],
 			totalMessages: chan?.shared.totalMessages ?? 0,
 		});
+	});
+
+	bus.handle("quote:fetch", ({target, msgid}) => {
+		const client = registry.clientForChannel(target);
+		const chan = client?.channelById(target);
+
+		if (client && chan) {
+			requestQuote(client, chan, msgid);
+		}
 	});
 
 	bus.handle("history:trim", ({target, ids}) => {

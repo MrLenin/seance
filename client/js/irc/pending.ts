@@ -109,6 +109,9 @@ export function showPending(
 		pending: true,
 		users: [],
 		...(fields.replyTo ? {replyTo: fields.replyTo} : {}),
+		...(fields.replyTo && chan.quoteOf(fields.replyTo)
+			? {replyQuote: chan.quoteOf(fields.replyTo)}
+			: {}),
 		...(fields.editOf ? {editOf: fields.editOf} : {}),
 		...(fields.statusmsgGroup ? {statusmsgGroup: fields.statusmsgGroup} : {}),
 	};

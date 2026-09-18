@@ -45,6 +45,7 @@ import {
 } from "./multiline";
 import {cancelMarkRead, markReadAt, scheduleMarkRead} from "./handlers/markread";
 import {abortHistory, retryLostHistory} from "./history";
+import {resetQuotes} from "./quotes";
 import {
 	cancelCatchup,
 	dropFromCatchup,
@@ -1004,6 +1005,7 @@ export class IrcClient {
 		resetBatches(this);
 		resetMultiline(this);
 		abortHistory(this);
+		resetQuotes(this);
 		cancelCatchup(this);
 		cancelRestoration(this);
 		this.saveCursor(); // the newest one must not die with the connection

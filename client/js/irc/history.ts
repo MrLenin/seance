@@ -45,6 +45,7 @@ import type {BatchHandler} from "./handlers/batch";
 import {formatLine, IrcMessage} from "./message";
 import {settlePendingLabel} from "./pending";
 import {inBouncerReplay, inServerCatchup} from "./persistence";
+import {resolveQuote} from "./quotes";
 import type {Handler} from "./types";
 
 /** How long to wait for the server before answering `more` with nothing. */
@@ -59,18 +60,21 @@ const MAX_CATCHUP_PAGES = 5;
  * held (the spec's FUZZ_INTERVAL, "perhaps 1 to 10 seconds"). */
 export const CATCHUP_FUZZ_MS = 5_000;
 
-export type HistorySubcommand = "LATEST" | "BEFORE" | "AFTER";
+export type HistorySubcommand = "LATEST" | "BEFORE" | "AFTER" | "AROUND";
 
 export interface HistorySpec {
 	subcommand: HistorySubcommand;
 	/** Reference message (required for BEFORE / AFTER). */
 	ref?: MsgRef;
 	limit: number;
-	mode: "prepend" | "append";
+	/** prepend: a `more` page; append: catch-up; quote: a reply's parent (quotes.ts). */
+	mode: "prepend" | "append" | "quote";
 	pagesLeft?: number;
 	floor?: MsgRef;
 	/** Re-issue after a reconnect when the answer never came (the `more` pages). */
 	retry?: boolean;
+	/** mode quote: the parent asked for. */
+	quote?: string;
 }
 
 export interface HistoryRequest {
@@ -79,8 +83,10 @@ export interface HistoryRequest {
 	subcommand: HistorySubcommand;
 	/** `labeled-response` label the reply is expected to carry. */
 	label?: string;
-	/** prepend: answer `more`; append: deliver as live `msg` events. */
-	mode: "prepend" | "append";
+	/** prepend: answer `more`; append: deliver as live `msg` events; quote: answer quotes.ts. */
+	mode: "prepend" | "append" | "quote";
+	/** mode quote: the parent asked for. */
+	quote?: string;
 	/** Limit as sent; a reply of this many lines means more may exist. */
 	limit: number;
 	/**
@@ -190,6 +196,7 @@ export function requestHistory(
 		mode: spec.mode,
 		limit,
 		retry: spec.retry ? {...spec, retry: false} : undefined,
+		quote: spec.quote,
 		pagesLeft: spec.pagesLeft ?? 0,
 		floor: spec.floor,
 		gap: [],
@@ -197,7 +204,11 @@ export function requestHistory(
 		timer: setTimeout(() => resolve(client, request, null, "timeout"), HISTORY_TIMEOUT_MS),
 	};
 	pendingOf(client).push(request);
-	chan.historyRequested = true;
+
+	if (spec.mode !== "quote") {
+		chan.historyRequested = true; // a quote fetch is not a fill
+	}
+
 	return request;
 }
 
@@ -487,6 +498,13 @@ function resolve(
 	clearTimeout(request.timer);
 
 	const {chan} = request;
+
+	if (request.mode === "quote") {
+		// Never replayed into the channel: the parent stays out of the timeline.
+		resolveQuote(client, chan, request.quote ?? "", outcome === "timeout" ? null : lines ?? []);
+		return;
+	}
+
 	const {messages, after} =
 		lines && lines.length > 0 ? replay(client, chan, lines) : {messages: [], after: []};
 	const fullPage = lines !== null && lines.length >= request.limit;
