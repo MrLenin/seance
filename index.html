@@ -6,6 +6,6 @@
 <li><a href="base/">base/</a> — 2026-09-06 merge (1f7decd7), "was working"</li>
 <li><a href="develop/">develop/</a> — develop head (d6b6624b), current deploy</li>
 <li><a href="pr51/">pr51/</a> — PR #51 fix (verified compensation + armed auto-load)</li>
-<li><a href="next/">next/</a> — 2026-09-17 (i): replies now quote parents the app never loaded (fetched on demand; "(message not available)" when the server has nothing) + the four scrollback fixes (mid-fling hold, per-channel trim, reconnect scroll, lost-page retry) plus a beefed-up /histdbg that now also dumps the last 40 CHATHISTORY/BATCH wire lines (one message each, so nothing truncates) — run it in a stuck channel and screenshot.</li>
+<li><a href="next/">next/</a> — 2026-09-18 (j): scrollback after a reconnect no longer asks for the same page forever (the page goes before the oldest message held, not the line shown first) + (i) reply quotes for parents never loaded + the scrollback fixes of #62; /histdbg diag</li>
 </ul>
 <p>Each is its own origin path, so settings and networks are separate; the service worker registers per path too.</p>
