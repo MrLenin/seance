@@ -33,11 +33,50 @@ test.skip(!host || !account, "set SEANCE_E2E_IRC_HOST and SEANCE_E2E_SASL_ACCOUN
 
 const channel = `#e2ebg-${Math.random().toString(36).slice(2, 8)}`;
 let seedSocket: net.Socket | null = null;
+/** Another client of the same account, connected throughout (the phone is a bouncer alias beside it). */
+let companion: net.Socket | null = null;
+
+/**
+ * The wire signature of the stall of 2026-09-18: the same `CHATHISTORY
+ * BEFORE <target> <ref>` asked again and again, because the page was
+ * anchored on a local line at the top of the buffer (stamped with the
+ * connect time) rather than on the oldest message held, so it brought
+ * back only rows already shown. Every page a flow asks for must reference
+ * something new. Collected by connectAndSeed's frame hook, checked after
+ * each test.
+ */
+const pagesAsked = new Set<string>();
+const repeatedPages: string[] = [];
+
+function notePageAsked(payload: string): void {
+	const m = /CHATHISTORY BEFORE (\S+) (\S+) \d+/.exec(payload);
+
+	if (!m) {
+		return;
+	}
+
+	const key = `${m[1]} ${m[2]}`;
+
+	if (pagesAsked.has(key)) {
+		repeatedPages.push(key);
+	}
+
+	pagesAsked.add(key);
+}
+
+test.beforeEach(() => {
+	pagesAsked.clear();
+	repeatedPages.length = 0;
+});
 
 test.afterEach(() => {
 	seedSocket?.write("QUIT :seeded\r\n");
 	seedSocket?.end();
 	seedSocket = null;
+	companion?.write("QUIT :done\r\n");
+	companion?.end();
+	companion = null;
+	expect(repeatedPages, "a page was asked for twice with the same reference").toEqual([]);
 });
 
 function seedHistory(): Promise<void> {
@@ -123,7 +162,7 @@ function showMoreVisible(page: Page) {
  * page. `wire` collects the history-related frames of every socket the page
  * opens, for the failure messages.
  */
-async function connectAndSeed(page: Page, wire: string[]): Promise<number[]> {
+async function connectAndSeed(page: Page, wire: string[], remember = false): Promise<number[]> {
 	page.on("websocket", (ws) => {
 		ws.on("framesent", (f) => {
 			const p = String(f.payload);
@@ -131,6 +170,8 @@ async function connectAndSeed(page: Page, wire: string[]): Promise<number[]> {
 			if (/CHATHISTORY|PERSISTENCE|JOIN|AUTHENTICATE/i.test(p)) {
 				wire.push(`> ${p.slice(0, 90)}`);
 			}
+
+			notePageAsked(p);
 		});
 		ws.on("framereceived", (f) => {
 			const p = String(f.payload);
@@ -199,6 +240,14 @@ async function connectAndSeed(page: Page, wire: string[]): Promise<number[]> {
 	await page.check("#connect input[name=sasl]");
 	await page.fill("#connect\\:saslAccount", account);
 	await page.fill("#connect\\:saslPassword", password);
+
+	if (remember) {
+		// Saved with its password and autoconnect, the way the phone's is:
+		// a reloaded page then reconnects by itself.
+		await page.check("#connect input[name=rememberPassword]");
+		await page.check("#connect input[name=autoconnect]");
+	}
+
 	await page.click("#connect form button[type=submit]");
 	await page.waitForSelector(`#chat-container[data-current-channel="${channel}"]`, {
 		timeout: 60_000,
@@ -244,6 +293,66 @@ function closeSocket(page: Page) {
 }
 
 /** A page of history must prepend older rows, never duplicate, never append. */
+/**
+ * A second client of the bouncer account, logged in over plain TCP with
+ * SASL PLAIN and joined to the channel, that stays for the whole test: the
+ * browser is then a bouncer alias beside it, as the phone is beside a
+ * desktop client. Resolves once it is in the channel.
+ */
+function companionJoins(): Promise<void> {
+	return new Promise((resolve, reject) => {
+		const s = net.connect(seedPort, seedHost);
+		let buf = "";
+		const nick = `mate${Math.floor(1000 + Math.random() * 9000)}`;
+		const creds = Buffer.from(`\0${account}\0${password}`).toString("base64");
+		s.setEncoding("utf8");
+		s.on("error", reject);
+		s.on("data", (d: string) => {
+			buf += d;
+			let i: number;
+
+			while ((i = buf.indexOf("\r\n")) >= 0) {
+				const line = buf.slice(0, i);
+				buf = buf.slice(i + 2);
+
+				if (line.startsWith("PING")) {
+					s.write(`PONG ${line.slice(5)}\r\n`);
+				} else if (/ CAP \S+ ACK :.*sasl/.test(line)) {
+					s.write("AUTHENTICATE PLAIN\r\n");
+				} else if (line === "AUTHENTICATE +") {
+					s.write(`AUTHENTICATE ${creds}\r\n`);
+				} else if (/ 903 /.test(line)) {
+					s.write("CAP END\r\n");
+				} else if (/ 90[45] /.test(line)) {
+					reject(new Error(`companion SASL failed: ${line}`));
+				} else if (/ 001 /.test(line)) {
+					s.write(`JOIN ${channel}\r\n`);
+				} else if (new RegExp(`^:\\S+ JOIN :?${channel}$`, "i").test(line)) {
+					// Our own join (a revived session may have renamed us).
+					companion = s;
+					resolve();
+				}
+			}
+		});
+		s.write(`CAP REQ :sasl\r\nNICK ${nick}\r\nUSER c c c :companion\r\n`);
+	});
+}
+
+/** More rows from the seed while the app is away, numbered on from the last. */
+function seedMore(n: number): Promise<void> {
+	return new Promise((resolve) => {
+		let i = 0;
+		const tick = setInterval(() => {
+			seedSocket?.write(`PRIVMSG ${channel} :row ${ROWS + i}\r\n`);
+
+			if (++i >= n) {
+				clearInterval(tick);
+				setTimeout(resolve, 1500);
+			}
+		}, 12);
+	});
+}
+
 function expectPaged(now: number[], prev: number[], label: string): void {
 	expect(now[now.length - 1], `${label}: the newest row changed`).toBe(prev[prev.length - 1]);
 	expect(now[0], `${label}: nothing older was prepended`).toBeLessThan(prev[0]);
@@ -409,4 +518,65 @@ test("scrolling up right after resume, over three background cycles, keeps pagin
 		expectPaged(now, after, `cycle ${cycle}: paged`);
 		prev = now;
 	}
+});
+
+// The case that took twelve hours to show itself on the phone (2026-09-18):
+// iOS evicted the PWA and RELOADED it on return. A reloaded page starts
+// with empty buffers; the saved network reconnects, the stored cursor makes
+// the server replay what landed meanwhile, and those rows are appended
+// under whatever the connect pushed first, a local line stamped with the
+// connect time. A page anchored on that line asks for the newest rows,
+// which are the ones just shown, and the same page is asked for forever.
+//
+// Honest note: on the bed the reloaded page's top row is a real message,
+// even as a bouncer alias beside a companion client, so this flow passed
+// before the fix too; whatever line the phone had on top of #afternet
+// (a services notice into the channel at join is the likely one) is not
+// reproduced here. The unit tests in test/irc/history.ts pin the
+// mechanism; this keeps the reload-as-alias flow and the "no page asked
+// twice" check (afterEach) exercised on a real server.
+test("a reload while away (iOS reloading the PWA) pages on from the oldest message, not the connect time", async ({
+	page,
+}) => {
+	test.setTimeout(300_000);
+	const wire: string[] = [];
+	// The desktop client stays; the browser is an alias beside it, as the
+	// phone is: its rejoin after the reload pushes its own join lines.
+	await companionJoins();
+	await connectAndSeed(page, wire, true);
+
+	// Rows land while the app is gone.
+	await seedMore(120);
+	await page.reload();
+	await page.waitForSelector("#input:not([disabled])", {timeout: 90_000});
+
+	if (!(await page.$(`#chat-container[data-current-channel="${channel}"]`))) {
+		await page.click(`[data-name="${channel}"]`);
+		await page.waitForSelector(`#chat-container[data-current-channel="${channel}"]`, {
+			timeout: 30_000,
+		});
+	}
+
+	// The rows that landed while away arrive by the replay (or a catch-up),
+	// appended: the newest of them closes the buffer.
+	await expect
+		.poll(async () => (await rows(page)).at(-1), {
+			timeout: 60_000,
+			message: `the rows from while away never came\n${wire.join("\n")}`,
+		})
+		.toBe(ROWS + 119);
+	await page.waitForTimeout(1500);
+	const after = await rows(page);
+
+	// Scrolling up must bring rows older than everything shown, not the
+	// page just shown again (afterEach also checks no page is asked twice).
+	await scrollTo(page, 0);
+	await expect
+		.poll(async () => (await rows(page))[0], {
+			timeout: 30_000,
+			message: `no older rows arrived after the reload\n${wire.join("\n")}`,
+		})
+		.toBeLessThan(after[0]);
+	await page.waitForTimeout(800);
+	expectPaged(await rows(page), after, "after the reload");
 });
