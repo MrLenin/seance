@@ -9,6 +9,7 @@ import NetworkEdit from "../components/Windows/NetworkEdit.vue";
 import SearchResults from "../components/Windows/SearchResults.vue";
 import RoutedChat from "../components/RoutedChat.vue";
 import {store} from "./store";
+import socket from "./socket";
 
 import AppearanceSettings from "../components/Settings/Appearance.vue";
 import GeneralSettings from "../components/Settings/General.vue";
@@ -278,8 +279,10 @@ router.afterEach((to) => {
 		}
 
 		if (channel.messages?.length > 100) {
-			channel.messages.splice(0, channel.messages.length - 100);
+			const dropped = channel.messages.splice(0, channel.messages.length - 100);
 			channel.moreHistoryAvailable = true;
+			// The IRC layer must stop counting them as shown (bus-contract § 2).
+			socket.emit("history:trim", {target: channel.id, ids: dropped.map((m) => m.id)});
 		}
 	}
 });
