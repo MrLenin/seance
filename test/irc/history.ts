@@ -305,7 +305,7 @@ describe("Chat history (history.ts)", function () {
 			const h = setup();
 			const id = joined(h);
 			h.transport.line(
-				"@msgid=live-7;time=2026-08-25T12:01:00.000Z :bob!bob@host PRIVMSG #seance :hi"
+				"@msgid=live-7;time=2026-08-25T11:59:00.000Z :bob!bob@host PRIVMSG #seance :hi"
 			);
 			const [{msg}] = msgs(id);
 
@@ -339,28 +339,75 @@ describe("Chat history (history.ts)", function () {
 			const h = setup();
 			const id = joined(h);
 			h.transport.line(
-				"@time=2026-08-25T12:01:30.500Z :bob!bob@host PRIVMSG #seance :no msgid"
+				"@time=2026-08-25T11:59:30.500Z :bob!bob@host PRIVMSG #seance :no msgid"
 			);
 			const [{msg}] = msgs(id);
 
 			socket.emit("more", {target: id, lastId: msg.id, condensed: false});
 
 			expect(h.sent()[0]).to.match(
-				/CHATHISTORY BEFORE #seance timestamp=2026-08-25T12:01:30\.500Z 100$/
+				/CHATHISTORY BEFORE #seance timestamp=2026-08-25T11:59:30\.500Z 100$/
 			);
+		});
+
+		it("`more` anchors on the oldest loaded message, not the line the UI shows first", function () {
+			const h = setup();
+			const id = joined(h);
+			// A line without a msgid at the top (a local line after a reconnect)...
+			h.transport.line(
+				"@time=2026-08-25T12:05:00.000Z :bob!bob@host PRIVMSG #seance :no msgid"
+			);
+			const [{msg: top}] = msgs(id);
+			// ...then older messages appended below it (a bouncer replay).
+			h.transport.line(hist(3));
+			h.transport.line(hist(4));
+
+			socket.emit("more", {target: id, lastId: top.id, condensed: false});
+
+			expect(h.sent()[0]).to.match(/CHATHISTORY BEFORE #seance msgid=m3 100$/);
+		});
+
+		it("a page that adds nothing moves the next page past its oldest row", function () {
+			const h = setup();
+			const id = joined(h);
+			h.transport.line(hist(9));
+			const [{msg}] = msgs(id);
+			socket.emit("more", {target: id, lastId: msg.id, condensed: false});
+			// Rows that make no message (typing notifications kept in history).
+			reply(h, h.sent(), [
+				"@time=2026-08-25T11:02:00.000Z;msgid=t2;+typing=active :bob!bob@host TAGMSG #seance",
+				"@time=2026-08-25T11:01:00.000Z;msgid=t1;+typing=active :bob!bob@host TAGMSG #seance",
+			]);
+			const [dead] = mores(id);
+			expect(dead.messages).to.deep.equal([]);
+			expect(dead.moreAvailable).to.equal(true);
+
+			socket.emit("more", {target: id, lastId: msg.id, condensed: false});
+
+			expect(h.sent()[0], "the next page starts before the dead page").to.match(
+				/CHATHISTORY BEFORE #seance msgid=t1 100$/
+			);
+
+			// A page that does add something clears the mark: the cursor is
+			// the oldest message again, not the dead page's row.
+			reply(h, h.sent(), [hist(5)]);
+			const [, second] = mores(id);
+			socket.emit("more", {target: id, lastId: second.messages[0].id, condensed: false});
+
+			expect(h.sent()[0]).to.match(/CHATHISTORY BEFORE #seance msgid=m5 100$/);
 		});
 
 		it("uses timestamp= when MSGREFTYPES excludes msgid", function () {
 			const h = setup({isupport: "CHATHISTORY=100 MSGREFTYPES=timestamp"});
 			const id = joined(h);
 			h.transport.line(
-				"@msgid=x;time=2026-08-25T12:02:00.000Z :bob!bob@host PRIVMSG #seance :hi"
+				"@msgid=x;time=2026-08-25T11:58:00.000Z :bob!bob@host PRIVMSG #seance :hi"
 			);
 			const [{msg}] = msgs(id);
 
 			socket.emit("more", {target: id, lastId: msg.id, condensed: false});
 
-			expect(h.sent()[0]).to.match(/BEFORE #seance timestamp=2026-08-25T12:02:00\.000Z 100$/);
+			expect(h.sent()[0]).to.match(/BEFORE #seance timestamp=2026-08-25T11:58:00\.000Z 100$/);
 		});
 
 		it("`more` with lastId -1 asks for LATEST", function () {
@@ -966,7 +1013,7 @@ describe("Chat history (history.ts)", function () {
 			const h = setup();
 			const id = joined(h);
 			h.transport.line(
-				"@msgid=live-7;time=2026-08-25T12:01:00.000Z :bob!bob@host PRIVMSG #seance :hi"
+				"@msgid=live-7;time=2026-08-25T11:59:00.000Z :bob!bob@host PRIVMSG #seance :hi"
 			);
 			const [{msg}] = msgs(id);
 

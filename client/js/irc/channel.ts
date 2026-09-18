@@ -78,6 +78,13 @@ export class Channel {
 	/** A `more` page the connection died on; asked again once we are back (history.ts). */
 	lostMore: HistorySpec | undefined = undefined;
 	/**
+	 * Oldest row of the last `more` page that added nothing (rows already
+	 * shown, or rows that make no message): the next page starts before it
+	 * instead of asking for the same one again. Cleared by a page that adds
+	 * something, and by a trim (history.ts).
+	 */
+	pageFloor: MsgRef | undefined = undefined;
+	/**
 	 * Read marker (`draft/read-marker`): the newest time we have sent or the
 	 * server has told us was read, on any of the account's sessions. Messages
 	 * at or before it never count as unread.
@@ -153,6 +160,8 @@ export class Channel {
 	 * are re-remembered, under fresh ids, when a page delivers them.
 	 */
 	forget(ids: number[]): void {
+		this.pageFloor = undefined;
+
 		for (const id of ids) {
 			const ref = this.msgRefs.get(id);
 

@@ -487,7 +487,7 @@ describe("PERSISTENCE ATTACH catch-up cursor (irc/persistence.ts)", function () 
 			);
 			batch(h, [], {label: labelOf(h.sent())});
 			h.transport.line(
-				"@time=2026-08-28T12:00:02.000Z;msgid=m1 :bob!bob@host PRIVMSG #seance :hi"
+				"@time=2026-08-28T12:00:00.500Z;msgid=m1 :bob!bob@host PRIVMSG #seance :hi"
 			);
 
 			// The user scrolls up; the socket dies before the page comes back.

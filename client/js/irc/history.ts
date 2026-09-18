@@ -233,21 +233,71 @@ export function requestMore(client: IrcClient, chan: Channel, lastId: number): b
 		);
 	}
 
-	const ref = chan.msgRefs.get(lastId);
+	const shown = chan.msgRefs.get(lastId);
 
-	if (!ref) {
+	if (!shown) {
 		return false;
 	}
 
 	return (
 		requestHistory(client, chan, {
 			subcommand: "BEFORE",
-			ref,
+			ref: oldestRef(chan, shown),
 			limit: MORE_PAGE_SIZE,
 			mode: "prepend",
 			retry: true,
 		}) !== undefined
 	);
+}
+
+/**
+ * What a `more` page goes before: the oldest message we hold, which is not
+ * always the one the UI shows first. After a reconnect a local line (the
+ * join, a status line) sits at the top stamped with the connect time and
+ * the replay's older messages are appended below it; a page asked before
+ * that line is the newest hundred, all shown already, and the cursor never
+ * moved (prod, 2026-09-18: the same BEFORE timestamp=<connect time> over
+ * and over). The oldest row of a page that added nothing counts too
+ * (`Channel.pageFloor`), so the next page starts past it. A time tie goes
+ * to the reference with a msgid.
+ */
+function oldestRef(chan: Channel, shown: MsgRef): MsgRef {
+	let oldest = shown;
+
+	const consider = (ref: MsgRef) => {
+		const t = ref.time.getTime();
+		const o = oldest.time.getTime();
+
+		if (t < o || (t === o && ref.msgid && !oldest.msgid)) {
+			oldest = ref;
+		}
+	};
+
+	for (const ref of chan.msgRefs.values()) {
+		consider(ref);
+	}
+
+	if (chan.pageFloor) {
+		consider(chan.pageFloor);
+	}
+
+	return oldest;
+}
+
+/** The oldest line of a page by its `time` tag, as a reference; none when no line carries a usable time. */
+function oldestLineRef(lines: IrcMessage[]): MsgRef | undefined {
+	let oldest: MsgRef | undefined;
+
+	for (const line of lines) {
+		const stamp = line.tags.get("time");
+		const time = stamp ? new Date(stamp) : undefined;
+
+		if (time && !Number.isNaN(time.getTime()) && (!oldest || time < oldest.time)) {
+			oldest = {msgid: line.tags.get("msgid"), time};
+		}
+	}
+
+	return oldest;
 }
 
 /**
@@ -500,8 +550,8 @@ function resolve(
 		const page = lines ?? [];
 		const known = new Set(chan.msgids);
 		const floorMs = request.floor ? request.floor.time.getTime() - CATCHUP_FUZZ_MS : undefined;
+		const oldest = oldestLineRef(page);
 		let reached = page.length === 0;
-		let oldest: MsgRef | undefined;
 
 		for (const line of page) {
 			const msgid = line.tags.get("msgid");
@@ -512,14 +562,13 @@ function resolve(
 				reached = true;
 			}
 
-			if (time && !Number.isNaN(time.getTime())) {
-				if (floorMs !== undefined && time.getTime() < floorMs) {
-					reached = true;
-				}
-
-				if (!oldest || time < oldest.time) {
-					oldest = {msgid, time};
-				}
+			if (
+				floorMs !== undefined &&
+				time &&
+				!Number.isNaN(time.getTime()) &&
+				time.getTime() < floorMs
+			) {
+				reached = true;
 			}
 		}
 
@@ -562,6 +611,17 @@ function resolve(
 	// (2026-09-06). An older server that never sends the tag ends with an
 	// empty page, which still closes the button.
 	const more = outcome === "timeout" || (lines !== null && lines.length > 0 && !end) || fullPage;
+
+	// A page with rows but nothing new (all shown already, or rows that make
+	// no message) leaves the cursor where it was: remember its oldest row so
+	// the next page starts past it (requestMore). A page that adds something
+	// clears the mark.
+	if (lines && lines.length > 0 && messages.length === 0) {
+		chan.pageFloor = oldestLineRef(lines) ?? chan.pageFloor;
+	} else if (messages.length > 0) {
+		chan.pageFloor = undefined;
+	}
+
 	deliverPrepend(client, chan, messages, more);
 	runAfter(after);
 }
