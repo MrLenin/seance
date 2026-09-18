@@ -177,6 +177,7 @@ import {
 	searchEmoji,
 } from "../js/helpers/emoji";
 import {DEFAULT_REACTIONS, recentReactions, rememberReaction} from "../js/helpers/reactionRecents";
+import {visibleHeight} from "../js/helpers/viewport";
 
 /** One thing the list offers: an emoji, a remembered reaction, or typed text. */
 type Option = {
@@ -714,7 +715,9 @@ export default defineComponent({
 			}
 
 			const rect = anchor.getBoundingClientRect();
-			const vh = window.innerHeight;
+			// The visible band, not `innerHeight`: on iOS the keyboard covers
+			// the bottom of the layout viewport without shrinking it.
+			const vh = visibleHeight();
 			const vw = window.innerWidth;
 
 			// Scrolled past the message the picker belongs to: close rather
@@ -783,6 +786,7 @@ export default defineComponent({
 			document.addEventListener("mousedown", onDocumentMouseDown);
 			window.addEventListener("scroll", reposition, true);
 			window.addEventListener("resize", reposition);
+			window.visualViewport?.addEventListener("resize", reposition);
 			sheetQuery.addEventListener("change", onSheetChange);
 			eventbus.on("escapekey", close);
 
@@ -800,6 +804,7 @@ export default defineComponent({
 			document.removeEventListener("mousedown", onDocumentMouseDown);
 			window.removeEventListener("scroll", reposition, true);
 			window.removeEventListener("resize", reposition);
+			window.visualViewport?.removeEventListener("resize", reposition);
 			sheetQuery.removeEventListener("change", onSheetChange);
 			eventbus.off("escapekey", close);
 

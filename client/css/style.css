@@ -4715,15 +4715,20 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 }
 
 /* On a phone the on-screen keyboard leaves no room for a popover, so the
-   picker becomes a sheet along the bottom edge instead. */
+   picker becomes a sheet along the bottom edge instead. The bottom edge is the
+   visual viewport's, not the layout viewport's: iOS keeps `100%` of a fixed
+   element at the full window height under the keyboard, so `bottom: 0` put
+   the sheet's list behind it as soon as the search field took the caret.
+   `--viewport-height` (helpers/viewport.ts) is the visible band; the
+   difference is the keyboard, and the sheet takes 70% of what is left. */
 .reaction-picker.sheet {
 	top: auto;
 	right: 0;
-	bottom: 0;
+	bottom: calc(100% - var(--viewport-height, 100%));
 	left: 0;
 	width: 100%;
 	max-width: none;
-	max-height: 70vh;
+	max-height: calc(var(--viewport-height, 100%) * 0.7);
 	border-width: 1px 0 0;
 	border-radius: 12px 12px 0 0;
 	transform-origin: bottom center;

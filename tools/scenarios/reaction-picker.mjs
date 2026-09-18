@@ -478,6 +478,22 @@ export default async function run(page) {
 			Math.round(sheet.y + sheet.height) === 780
 	);
 	await page.screenshot("8-sheet", {selector: "body", pad: 0});
+
+	// The sheet ends where the visible band ends, not where the window does:
+	// on iOS the keyboard covers the bottom 300px or so of a fixed element's
+	// `bottom: 0` without shrinking the window. helpers/viewport.ts publishes
+	// the band as `--viewport-height`; a headless Chromium has no keyboard, so
+	// the scenario publishes one of 480px by hand and expects the sheet to
+	// move up out of the covered part and shrink to 70% of what is left.
+	await page.evaluate(`document.documentElement.style.setProperty("--viewport-height", "480px")`);
+	await page.sleep(200);
+	const raised = await page.rect(PICKER);
+	await page.check(
+		`the sheet keeps above the keyboard (${JSON.stringify(raised)})`,
+		Math.round(raised.y + raised.height) === 480 && raised.height <= 480 * 0.7 + 1
+	);
+	await page.screenshot("8b-sheet-keyboard", {selector: "body", pad: 0});
+	await page.evaluate(`document.documentElement.style.removeProperty("--viewport-height")`);
 	await page.send("Emulation.clearDeviceMetricsOverride");
 	await page.sleep(400);
 
