@@ -4715,18 +4715,55 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 }
 
 /* On a phone the on-screen keyboard leaves no room for a popover, so the
-   picker becomes a sheet along the bottom edge instead. */
+   picker becomes a sheet along the bottom edge instead. The bottom edge is the
+   visual viewport's, not the layout viewport's: iOS keeps `100%` of a fixed
+   element at the full window height under the keyboard, so `bottom: 0` put
+   the sheet's list behind it as soon as the search field took the caret.
+   `--viewport-height` (helpers/viewport.ts) is the visible band; the
+   difference is the keyboard, and the sheet takes 70% of what is left. */
 .reaction-picker.sheet {
 	top: auto;
 	right: 0;
-	bottom: 0;
+	bottom: calc(100% - var(--viewport-height, 100%));
 	left: 0;
 	width: 100%;
 	max-width: none;
-	max-height: 70vh;
+	max-height: calc(var(--viewport-height, 100%) * 0.7);
 	border-width: 1px 0 0;
 	border-radius: 12px 12px 0 0;
 	transform-origin: bottom center;
+}
+
+/* A phone on its side with the keyboard up keeps ~190px (helpers/viewport.ts
+   sets data-keyboard from the same measurement). 70% of that held the search
+   field and the tabs and no emoji, so there the sheet takes the whole band —
+   what it would leave is under the keyboard — and the tab strip stands down
+   while the filter being typed is what picks the group; the list keeps two
+   rows. The band is the visible height, so this cannot be a container query. */
+@media (max-height: 500px) and (hover: none) and (pointer: coarse) {
+	html[data-keyboard="up"] .reaction-picker.sheet {
+		max-height: var(--viewport-height, 100%);
+		border-radius: 0;
+	}
+
+	html[data-keyboard="up"] .reaction-picker.sheet .reaction-picker-tabs {
+		display: none;
+	}
+
+	/* The rest of the chrome tightens for the same reason: at the default
+	   paddings the search row and the preview bar took 106px of 190. */
+	html[data-keyboard="up"] .reaction-picker.sheet .reaction-picker-search {
+		padding: 4px 8px;
+	}
+
+	html[data-keyboard="up"] .reaction-picker.sheet .reaction-picker-heading {
+		padding: 4px 2px 2px;
+	}
+
+	html[data-keyboard="up"] .reaction-picker.sheet .reaction-picker-preview {
+		min-height: 2rem;
+		padding: 2px 10px;
+	}
 }
 
 @keyframes reaction-picker-in {
