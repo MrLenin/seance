@@ -4632,14 +4632,17 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 		-webkit-touch-callout: default;
 	}
 
-	/* The message whose toolbar is open is selectable again: a second long
-	 * press there is the platform's — a native selection with its handles —
-	 * and the moment one exists (`selection-live`, MessageList.vue via
+	/* The message whose toolbar is open is selectable again — but only once
+	 * the press that opened it has ended (`select-armed`, Message.vue):
+	 * flipped mid-press, the platform's own long-press detector would start
+	 * a selection off that same held finger. From the next press on it is
+	 * the platform's — a native selection with its handles — and the moment
+	 * one exists (`selection-live`, MessageList.vue via
 	 * helpers/touchSelection.ts) the whole scrollback is selectable, so the
 	 * handles can be dragged across messages: how several lines are copied
 	 * at once on a phone. A tap collapses the selection, which puts the
 	 * rule back by itself. */
-	#chat .messages .msg.actions-open,
+	#chat .messages .msg.select-armed,
 	#chat .chat.selection-live .messages .msg {
 		user-select: text;
 		-webkit-touch-callout: default;
