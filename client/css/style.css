@@ -4591,6 +4591,13 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	display: none;
 }
 
+/* A live selection in the scrollback puts every toolbar away too
+ * (Message.vue closes the open one; this also keeps a :focus-within
+ * leftover from covering the selection). */
+#chat .chat.selection-live .msg-actions {
+	display: none;
+}
+
 /* While the jump-to-recent arrow is up (the view is scrolled back) it owns
  * the bottom-right corner: the toolbar moves left of its column so the two
  * never overlap, whichever row is hovered. */
@@ -4622,6 +4629,19 @@ part/quit messages where we don't load previews (adds a blank line otherwise) */
 	}
 
 	#chat .messages .msg a {
+		-webkit-touch-callout: default;
+	}
+
+	/* The message whose toolbar is open is selectable again: a second long
+	 * press there is the platform's — a native selection with its handles —
+	 * and the moment one exists (`selection-live`, MessageList.vue via
+	 * helpers/touchSelection.ts) the whole scrollback is selectable, so the
+	 * handles can be dragged across messages: how several lines are copied
+	 * at once on a phone. A tap collapses the selection, which puts the
+	 * rule back by itself. */
+	#chat .messages .msg.actions-open,
+	#chat .chat.selection-live .messages .msg {
+		user-select: text;
 		-webkit-touch-callout: default;
 	}
 }

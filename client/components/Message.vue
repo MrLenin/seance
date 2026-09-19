@@ -201,6 +201,7 @@ import {MessageType} from "../../shared/types/msg";
 import type {ClientChan, ClientMessage, ClientNetwork} from "../js/types";
 import {useStore} from "../js/store";
 import {hasVirtualKeyboard} from "../js/helpers/device";
+import {selectionActive} from "../js/helpers/touchSelection";
 
 MessageTypes.ParsedMessage = ParsedMessage;
 MessageTypes.LinkPreview = LinkPreview;
@@ -219,6 +220,16 @@ const LONG_PRESS_MS = 500;
 
 /** A finger that travels further than this is scrolling, not pressing. */
 const LONG_PRESS_SLOP_PX = 10;
+
+// The moment a selection exists in the scrollback the toolbar stands down:
+// the selection was made from it (a second long press on the open message)
+// and now covers the text it floated over. Selectability survives the close
+// through `.chat.selection-live` (helpers/touchSelection.ts).
+watch(selectionActive, (live) => {
+	if (live) {
+		openActions.value = null;
+	}
+});
 
 export default defineComponent({
 	name: "Message",
@@ -271,6 +282,16 @@ export default defineComponent({
 			// contextmenu instead) must not eat this one's.
 			swallowClick = false;
 
+			// A press on the message whose toolbar is already open — or
+			// anywhere while a selection is live — is the platform's: the
+			// text is selectable there (style.css), so its own long press
+			// selects, with its handles. Ours stands down. (After the
+			// swallowClick reset: a cleared flag is also what tells
+			// onContextMenu this is a fresh press, not the opening one.)
+			if (selectionActive.value || openActions.value === props.message.id) {
+				return;
+			}
+
 			const target = e.target as HTMLElement | null;
 
 			if (target?.closest("a, button, [role='button'], .msg-actions, .reaction-picker")) {
@@ -309,11 +330,21 @@ export default defineComponent({
 
 		const onTouchEnd = () => cancelPress();
 
-		// The browser's own long-press menu (Android) would open over ours.
+		// The browser's own long-press menu (Android) would open over ours —
+		// except when the long press was the platform's: a live selection's
+		// menu, or a fresh press on the message whose toolbar is already
+		// open. `swallowClick` still set means this very press is the one
+		// that opened the toolbar, and that race stays prevented.
 		const onContextMenu = (e: MouseEvent) => {
-			if (hasVirtualKeyboard()) {
-				e.preventDefault();
+			if (!hasVirtualKeyboard()) {
+				return;
 			}
+
+			if (selectionActive.value || (actionsOpen.value && !swallowClick)) {
+				return;
+			}
+
+			e.preventDefault();
 		};
 
 		// A tap on the row while a toolbar is open (this row's or another's)
