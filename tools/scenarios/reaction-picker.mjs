@@ -135,6 +135,30 @@ async function shiftClick(page, selector, index = 0) {
 	await page.sleep(120);
 }
 
+/**
+ * Scrolls the message to the middle of the pane and waits until its
+ * reaction "+" has stopped moving and is on screen. A fixed sleep after
+ * `scrollIntoView` raced the scrollback: the open picker's scroll listener
+ * repositions or closes it, the list can re-anchor, and a click measured
+ * mid-move landed beside the button (seen once in eight runs).
+ */
+async function scrollToMessage(page, selector) {
+	await page.evaluate(
+		`document.querySelector(${JSON.stringify(selector)}).scrollIntoView({block: "center"})`
+	);
+	await page.waitFor(
+		`(() => {
+			const el = document.querySelector(${JSON.stringify(`${selector} .msg-reaction-add`)});
+			if (!el) return false;
+			const r = el.getBoundingClientRect();
+			const same = window.__seanceLastTop === r.top;
+			window.__seanceLastTop = r.top;
+			return same && r.top >= 0 && r.bottom <= innerHeight;
+		})()`,
+		{label: "the message's reaction button to settle on screen"}
+	);
+}
+
 /** A real key press on whatever has focus (the picker's search field). */
 async function press(page, key, code = key) {
 	const enter = key === "Enter";
@@ -435,10 +459,7 @@ export default async function run(page) {
 
 	// Opening one from another message closes this one: the opener stops the
 	// mousedown the outside-click handler would have seen.
-	await page.evaluate(
-		`document.querySelector(${JSON.stringify(MSG)}).scrollIntoView({block: "center"})`
-	);
-	await page.sleep(200);
+	await scrollToMessage(page, MSG);
 	await page.click(`${MSG} .msg-reaction-add`);
 	await page.sleep(400);
 	await page.check("only one picker is ever open", (await page.count(PICKER)) === 1);
@@ -461,10 +482,7 @@ export default async function run(page) {
 	// channel puts the conversation back on screen.
 	await page.click(`.channel-list-item[data-name="${CHANNEL}"]`);
 	await page.sleep(400);
-	await page.evaluate(
-		`document.querySelector(${JSON.stringify(MSG)}).scrollIntoView({block: "center"})`
-	);
-	await page.sleep(300);
+	await scrollToMessage(page, MSG);
 	await page.click(`${MSG} .msg-reaction-add`);
 	await page.waitFor(`document.querySelector(${JSON.stringify(PICKER)})`, {
 		label: "the picker on a narrow viewport",
@@ -515,10 +533,7 @@ export default async function run(page) {
 	await page.send("Emulation.setTouchEmulationEnabled", {enabled: true, maxTouchPoints: 5});
 	await page.sleep(400);
 	await page.evaluate(`document.querySelector("#sidebar")?.classList.remove("open")`);
-	await page.evaluate(
-		`document.querySelector(${JSON.stringify(MSG)}).scrollIntoView({block: "center"})`
-	);
-	await page.sleep(300);
+	await scrollToMessage(page, MSG);
 	await page.click(`${MSG} .msg-reaction-add`);
 	await page.waitFor(`document.querySelector(${JSON.stringify(PICKER)})`, {
 		label: "the picker on a landscape phone",
