@@ -9,6 +9,7 @@
 				pending: message.pending,
 				'previous-source': isPreviousSource,
 				'actions-open': actionsOpen,
+				'select-armed': actionsOpen && selectArmed,
 			},
 		]"
 		:data-type="message.type"
@@ -214,6 +215,21 @@ MessageTypes.Username = Username;
  */
 const openActions = ref<number | null>(null);
 
+/**
+ * Whether the open message's text is selectable yet (`select-armed` in the
+ * template, the coarse-pointer rule in style.css). Not until the press that
+ * opened the toolbar has ended: the flip happens at the same 500 ms as the
+ * platform's own long-press detector, and on a finger still held down that
+ * detector, a beat later, would find the text selectable and start a
+ * selection off the very press that opened the toolbar. Armed on the
+ * opening press's touchend, cleared whenever the toolbar moves or closes.
+ */
+const selectArmed = ref(false);
+
+watch(openActions, () => {
+	selectArmed.value = false;
+});
+
 /** How long a finger has to stay down before the toolbar opens. Android's own
  * long press is 500 ms too, so the gesture feels like the platform's. */
 const LONG_PRESS_MS = 500;
@@ -328,7 +344,15 @@ export default defineComponent({
 			}
 		};
 
-		const onTouchEnd = () => cancelPress();
+		const onTouchEnd = () => {
+			cancelPress();
+
+			// The press on the open message is over: from here a long press
+			// is the platform's, so now the text may turn selectable.
+			if (openActions.value === props.message.id) {
+				selectArmed.value = true;
+			}
+		};
 
 		// The browser's own long-press menu (Android) would open over ours —
 		// except when the long press was the platform's: a live selection's
@@ -514,6 +538,7 @@ export default defineComponent({
 		return {
 			store,
 			actionsOpen,
+			selectArmed,
 			onTouchStart,
 			onTouchMove,
 			onTouchEnd,

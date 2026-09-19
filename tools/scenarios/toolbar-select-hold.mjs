@@ -185,14 +185,30 @@ export default async function run(page) {
 	await page.check("message text starts unselectable", (await userSelectOf(first)) === "none");
 	await page.check("no live-selection class yet", !(await selectionLive()));
 
-	// 1. The first long press opens the toolbar — and that message alone
-	//    becomes selectable: the second long press there is the platform's.
-	await longPress(page, `${first} .content`);
+	// 1. The first long press opens the toolbar — but while the finger is
+	//    still down the text stays unselectable: selectability is armed on
+	//    release (`select-armed`, Message.vue), or the platform's own
+	//    long-press detector, firing a beat after ours on the same held
+	//    press, would start a selection nobody asked for. Released, that
+	//    message alone becomes selectable: the second long press there is
+	//    the platform's.
+	const hold = await fingerAt(page, `${first} .content`);
+	await page.send("Input.dispatchTouchEvent", {type: "touchStart", touchPoints: hold});
+	await page.sleep(HOLD_MS);
 	await page.check(
-		`a long press opens the toolbar (${JSON.stringify(await openIds())})`,
+		`the toolbar is open while the finger is still down (${JSON.stringify(await openIds())})`,
 		(await openIds()).join() === first.slice(1)
 	);
-	await page.check("the open message is selectable now", (await userSelectOf(first)) === "text");
+	await page.check(
+		"the text is still unselectable under the held finger",
+		(await userSelectOf(first)) === "none"
+	);
+	await page.send("Input.dispatchTouchEvent", {type: "touchEnd", touchPoints: []});
+	await page.sleep(250);
+	await page.check(
+		"released, the open message is selectable now",
+		(await userSelectOf(first)) === "text"
+	);
 	await page.check(
 		"the other messages are not (their long press still opens/moves the toolbar)",
 		(await userSelectOf(second)) === "none"
