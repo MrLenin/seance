@@ -3,8 +3,8 @@
 // an own row's text is the muted colour under the default and the body
 // colour under the other two, the row carries a band under "band" and
 // nothing under "plain", another user's row never changes, a theme that
-// bands its own rows (princess) keeps that band under the default and
-// loses it under "plain", the stored value is the name, and the choice
+// bands its own rows (princess) shows that band under "band" only, the
+// stored value is the name, and the choice
 // survives a reload (client/js/helpers/ownMessages.ts, settings.ts,
 // style.css).
 //
@@ -203,26 +203,30 @@ export default async function run(page) {
 	page.check("plain: no band", (await ownBand()) === NONE);
 	await page.screenshot("4-coffee-plain");
 
-	// Princess bands its own rows itself: kept under the default, the
-	// theme's own colour under "band", gone under "plain".
+	// Princess bands its own rows itself: that band shows only under
+	// "band", in the theme's own colour (--own-bg), never under the default
+	// or "plain" — the three looks do not overlap.
 	await openAppearance();
 	await setTheme("princess");
 	await pick("muted");
 	await backToChat();
-	const princessBand = await ownBand();
+	page.check("princess: no band under the default", (await ownBand()) === NONE);
 	page.check(
-		`princess keeps its own band under the default (${princessBand})`,
-		princessBand !== NONE
+		"princess: own text greyed under the default",
+		(await ownText()) !== (await otherText())
 	);
 	await page.screenshot("5-princess-muted");
 	await openAppearance();
 	await pick("band");
 	await backToChat();
-	page.check("princess: band is the theme's own", (await ownBand()) === princessBand);
+	page.check(
+		"princess: band is the theme's own (#e2edff)",
+		(await ownBand()) === "rgb(226, 237, 255)"
+	);
 	await openAppearance();
 	await pick("plain");
 	await backToChat();
-	page.check("princess: plain lifts the theme's band", (await ownBand()) === NONE);
+	page.check("princess: plain, no band", (await ownBand()) === NONE);
 	await page.screenshot("6-princess-plain");
 
 	// Back to coffee on "band", then a reload: the choice comes back.
