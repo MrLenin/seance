@@ -53,13 +53,17 @@
 			<span v-if="channel.editing" class="compose-bar-label">
 				<span class="compose-bar-icon" aria-hidden="true">✎</span>
 				Editing message
-				<span class="compose-bar-preview">{{ composePreview }}</span>
+				<span class="compose-bar-preview"
+					><QuotePreview :text="composeTarget?.text ?? ''"
+				/></span>
 			</span>
 			<span v-else class="compose-bar-label">
 				<span class="compose-bar-icon" aria-hidden="true">↩</span>
 				Replying to <strong class="compose-bar-nick">{{ composeNick }}</strong
 				>:
-				<span class="compose-bar-preview">{{ composePreview }}</span>
+				<span class="compose-bar-preview"
+					><QuotePreview :text="composeTarget?.text ?? ''"
+				/></span>
 			</span>
 			<button
 				type="button"
@@ -164,6 +168,7 @@ import {hasVirtualKeyboard} from "../js/helpers/device";
 const ENTER_NEWLINE_WINDOW_MS = 500;
 import {TypingReporter} from "../js/helpers/typingReporter";
 import TypingIndicator from "./TypingIndicator.vue";
+import QuotePreview from "./QuotePreview.vue";
 
 const formattingHotkeys = {
 	"mod+k": "\x03",
@@ -192,7 +197,7 @@ const bracketWraps = {
 
 export default defineComponent({
 	name: "ChatInput",
-	components: {TypingIndicator},
+	components: {TypingIndicator, QuotePreview},
 	props: {
 		network: {type: Object as PropType<ClientNetwork>, required: true},
 		channel: {type: Object as PropType<ClientChan>, required: true},
@@ -383,11 +388,6 @@ export default defineComponent({
 		const composeTarget = computed(() => props.channel.editing || props.channel.replyTo);
 
 		const composeNick = computed(() => composeTarget.value?.from?.nick ?? "");
-
-		const composePreview = computed(() => {
-			const text = (composeTarget.value?.text ?? "").replace(/\s+/g, " ").trim();
-			return text.length > 80 ? text.slice(0, 79) + "…" : text;
-		});
 
 		/**
 		 * Run `line` as a UI-only command (`/collapse`, `/search`, …).
@@ -890,7 +890,7 @@ export default defineComponent({
 			setPendingMessage,
 			cancelCompose,
 			composeNick,
-			composePreview,
+			composeTarget,
 			showConnectionBar,
 			canSend,
 			connectionLabel,

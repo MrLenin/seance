@@ -49,14 +49,14 @@
 					class="msg-reply-quote"
 					:class="{unknown: !quote}"
 					:aria-label="quoteLabel"
-					:title="quote ? quote.text : undefined"
+					:title="quote ? quotePlain : undefined"
 					@click="jumpToParent"
 				>
 					<span class="msg-reply-arrow" aria-hidden="true">↩</span>
 					<template v-if="quote"
 						><span class="msg-reply-nick">{{ quote.nick }}</span
-						>&#32;<span class="msg-reply-text">{{ quote.text }}</span></template
-					>
+						>&#32;<span class="msg-reply-text"><QuotePreview :text="quote.text" /></span
+					></template>
 					<span v-else class="msg-reply-text">(unknown message)</span>
 				</button>
 				<StatusmsgMarker :group="message.statusmsgGroup" />
@@ -132,14 +132,14 @@
 					class="msg-reply-quote"
 					:class="{unknown: !quote}"
 					:aria-label="quoteLabel"
-					:title="quote ? quote.text : undefined"
+					:title="quote ? quotePlain : undefined"
 					@click="jumpToParent"
 				>
 					<span class="msg-reply-arrow" aria-hidden="true">↩</span>
 					<template v-if="quote"
 						><span class="msg-reply-nick">{{ quote.nick }}</span
-						>&#32;<span class="msg-reply-text">{{ quote.text }}</span></template
-					>
+						>&#32;<span class="msg-reply-text"><QuotePreview :text="quote.text" /></span
+					></template>
 					<span v-else class="msg-reply-text">(unknown message)</span>
 				</button>
 				<StatusmsgMarker :group="message.statusmsgGroup" />
@@ -197,7 +197,9 @@ import MessageTypes from "./MessageTypes";
 import StatusmsgMarker from "./StatusmsgMarker.vue";
 import MessageActions from "./MessageActions.vue";
 import MessageReactions from "./MessageReactions.vue";
+import QuotePreview from "./QuotePreview.vue";
 import {replyQuote} from "../js/helpers/messageUpdates";
+import {quoteLayout, toPlainText} from "../js/helpers/ircmessageparser/layout";
 import {MessageType} from "../../shared/types/msg";
 
 import type {ClientChan, ClientMessage, ClientNetwork} from "../js/types";
@@ -255,6 +257,7 @@ export default defineComponent({
 		StatusmsgMarker,
 		MessageActions,
 		MessageReactions,
+		QuotePreview,
 	},
 	props: {
 		message: {type: Object as PropType<ClientMessage>, required: true},
@@ -485,9 +488,19 @@ export default defineComponent({
 			return replyQuote(props.channel.messages, props.message.replyTo);
 		});
 
+		// The quote as plain text (tooltip, screen readers), cut like the
+		// rendered one
+		const quotePlain = computed(() =>
+			quote.value
+				? toPlainText(
+						quoteLayout(quote.value.text, 80, {markdown: store.state.settings.markdown})
+				  )
+				: ""
+		);
+
 		const quoteLabel = computed(() =>
 			quote.value
-				? `Replying to ${quote.value.nick}: ${quote.value.text}. Jump to that message.`
+				? `Replying to ${quote.value.nick}: ${quotePlain.value}. Jump to that message.`
 				: "Replying to a message that is not loaded"
 		);
 
@@ -555,6 +568,7 @@ export default defineComponent({
 			messageComponent,
 			isAction,
 			quote,
+			quotePlain,
 			quoteLabel,
 			jumpToParent,
 			revealed,
