@@ -177,6 +177,7 @@ import {
 	searchEmoji,
 } from "../js/helpers/emoji";
 import {DEFAULT_REACTIONS, recentReactions, rememberReaction} from "../js/helpers/reactionRecents";
+import {settle, visibleHeight} from "../js/helpers/viewport";
 
 /** One thing the list offers: an emoji, a remembered reaction, or typed text. */
 type Option = {
@@ -680,8 +681,13 @@ export default defineComponent({
 		};
 
 		// A phone gets the sheet at the bottom of the screen; there is no room
-		// for a popover once the on-screen keyboard is up.
-		const sheetQuery = window.matchMedia("(max-width: 479px)");
+		// for a popover once the on-screen keyboard is up. Sideways too: the
+		// second clause is the landscape-phone half of `PHONE_LAYOUT_QUERY`
+		// (helpers/device.ts) — a touch device under 500px tall with the
+		// keyboard up keeps ~190px, and a 21rem popover there showed one row.
+		const sheetQuery = window.matchMedia(
+			"(max-width: 479px), (max-height: 500px) and (hover: none) and (pointer: coarse)"
+		);
 		const sheet = ref(sheetQuery.matches);
 
 		const onSheetChange = (e: MediaQueryListEvent) => {
@@ -714,12 +720,18 @@ export default defineComponent({
 			}
 
 			const rect = anchor.getBoundingClientRect();
-			const vh = window.innerHeight;
+			// Room is measured against the visible band, not `innerHeight`: on
+			// iOS the keyboard covers the bottom of the layout viewport without
+			// shrinking it. Offsets stay in layout-viewport terms, which is
+			// what `position: fixed` resolves `top` and `bottom` against.
+			const vh = visibleHeight();
 			const vw = window.innerWidth;
 
 			// Scrolled past the message the picker belongs to: close rather
-			// than float over an unrelated part of the conversation.
-			if (rect.bottom < 0 || rect.top > vh) {
+			// than float over an unrelated part of the conversation. Against
+			// the layout viewport on purpose — an anchor under the keyboard
+			// is covered, not scrolled away.
+			if (rect.bottom < 0 || rect.top > window.innerHeight) {
 				emit("close");
 				return;
 			}
@@ -739,9 +751,18 @@ export default defineComponent({
 				left: `${Math.round(left)}px`,
 				"max-height": `${Math.round(room)}px`,
 				...(flip
-					? {bottom: `${Math.round(vh - rect.top + GAP)}px`}
+					? {bottom: `${Math.round(window.innerHeight - rect.top + GAP)}px`}
 					: {top: `${Math.round(rect.bottom + GAP)}px`}),
 			};
+		};
+
+		// The visual viewport's resize that announces the keyboard carries a
+		// mid-animation height (helpers/viewport.ts), so it is re-read.
+		let cancelSettle = () => {};
+
+		const repositionSettled = () => {
+			cancelSettle();
+			cancelSettle = settle(reposition);
 		};
 
 		const close = () => emit("close");
@@ -782,7 +803,8 @@ export default defineComponent({
 			eventbus.on(PICKER_OPENED, onOtherOpened);
 			document.addEventListener("mousedown", onDocumentMouseDown);
 			window.addEventListener("scroll", reposition, true);
-			window.addEventListener("resize", reposition);
+			window.addEventListener("resize", repositionSettled);
+			window.visualViewport?.addEventListener("resize", repositionSettled);
 			sheetQuery.addEventListener("change", onSheetChange);
 			eventbus.on("escapekey", close);
 
@@ -799,7 +821,9 @@ export default defineComponent({
 			eventbus.off(PICKER_OPENED, onOtherOpened);
 			document.removeEventListener("mousedown", onDocumentMouseDown);
 			window.removeEventListener("scroll", reposition, true);
-			window.removeEventListener("resize", reposition);
+			window.removeEventListener("resize", repositionSettled);
+			window.visualViewport?.removeEventListener("resize", repositionSettled);
+			cancelSettle();
 			sheetQuery.removeEventListener("change", onSheetChange);
 			eventbus.off("escapekey", close);
 

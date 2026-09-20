@@ -1,5 +1,10 @@
 <template>
-	<div ref="chat" class="chat" tabindex="-1">
+	<div
+		ref="chat"
+		class="chat"
+		:class="{selecting, 'selection-live': selectionActive}"
+		tabindex="-1"
+	>
 		<div v-show="channel.moreHistoryAvailable" class="show-more">
 			<button
 				ref="loadMoreButton"
@@ -17,6 +22,7 @@
 			aria-live="polite"
 			aria-relevant="additions"
 			@copy="onCopy"
+			@pointerdown="onPointerDown"
 		>
 			<template v-for="(message, id) in condensedMessages">
 				<DateMarker
@@ -59,9 +65,11 @@
 
 <script lang="ts">
 import {condensedTypes} from "../../shared/irc";
-import {ChanType} from "../../shared/types/chan";
+import {ChanState, ChanType} from "../../shared/types/chan";
 import {MessageType, SharedMsg} from "../../shared/types/msg";
 import clipboard from "../js/clipboard";
+import {noteScroll, noteTouch} from "../js/helpers/scrollSettle";
+import {selectionActive, unwatchSelection, watchSelection} from "../js/helpers/touchSelection";
 import socket from "../js/socket";
 import Message from "./Message.vue";
 import MessageCondensed from "./MessageCondensed.vue";
@@ -80,6 +88,9 @@ import {
 } from "vue";
 import {useStore} from "../js/store";
 import {ClientChan, ClientMessage, ClientNetwork, ClientLinkPreview} from "../js/types";
+
+/** A pressed pointer that travels this far is dragging out a selection. */
+const DRAG_SLOP_PX = 4;
 
 type CondensedMessageContainer = {
 	type: "condensed";
@@ -138,6 +149,23 @@ export default defineComponent({
 		const ANCHOR_TOLERANCE = 4;
 
 		/**
+		 * Our own scroll write. A scroll event follows only if something
+		 * moved: a flag armed for nothing swallows the user's next real
+		 * scroll, and with it the "at the bottom" state and the auto-load
+		 * re-arm that scroll should have set. (A page answered empty, or a
+		 * jump to a bottom we are already at, moves nothing.)
+		 */
+		const setScrollTop = (el: HTMLElement, top: number) => {
+			const before = el.scrollTop;
+
+			el.scrollTop = top;
+
+			if (el.scrollTop !== before) {
+				skipNextScrollEvent.value = true;
+			}
+		};
+
+		/**
 		 * Confirm the compensation stuck. WebKit ignores a scrollTop written
 		 * during momentum scrolling and rubber-banding; when the anchor is
 		 * lost within VERIFY_FOR_MS of the write, stop the momentum (toggling
@@ -169,29 +197,18 @@ export default defineComponent({
 			el.style.overflow = "hidden";
 			void el.offsetHeight; // flush: this is what kills the momentum
 			el.style.overflow = "";
-			skipNextScrollEvent.value = true;
-			el.scrollTop = el.scrollHeight - anchor.heightOld;
+			setScrollTop(el, el.scrollHeight - anchor.heightOld);
 			verifyTimer = setTimeout(verifyAnchor, 100);
 		};
 
 		const jumpToBottom = () => {
 			pendingAnchor = null; // a jump supersedes any anchor being verified
-			skipNextScrollEvent.value = true;
-
 			props.channel.scrolledToBottom = true;
 
 			const el = chat.value;
 
 			if (el) {
-				// A scroll event follows only if something moved; a flag armed
-				// for nothing would swallow the user's next real scroll.
-				const before = el.scrollTop;
-
-				el.scrollTop = el.scrollHeight;
-
-				if (el.scrollTop !== before) {
-					skipNextScrollEvent.value = true;
-				}
+				setScrollTop(el, el.scrollHeight);
 			}
 		};
 
@@ -239,10 +256,22 @@ export default defineComponent({
 					return; // the button stays for a tap; see autoLoadArmed
 				}
 
+				// Not connected: nothing can be asked, so the scroll that
+				// brought the button here is not spent. The page goes out when
+				// the channel is back (the readiness watch below re-observes).
+				if (!props.network.status.connected) {
+					return;
+				}
+
 				autoLoadArmed = false;
 				onShowMoreClick();
 			});
 		};
+
+		/** The button can be acted on: connected, and for a channel, joined. */
+		const canLoadMore = () =>
+			props.network.status.connected &&
+			(props.channel.type !== ChanType.CHANNEL || props.channel.state === ChanState.JOINED);
 
 		nextTick(() => {
 			if (!chat.value) {
@@ -411,9 +440,7 @@ export default defineComponent({
 					await nextTick();
 
 					isWaitingForNextTick.value = false;
-					skipNextScrollEvent.value = true;
-
-					el.scrollTop = el.scrollHeight - heightOld;
+					setScrollTop(el, el.scrollHeight - heightOld);
 
 					// Not final until it has survived the scroller's own motion.
 					lastPrependAt = Date.now();
@@ -449,6 +476,50 @@ export default defineComponent({
 			return !!selection && !selection.isCollapsed;
 		};
 
+		// --- a drag is a text selection: the action toolbar stands down ---
+		//
+		// `selecting` is a class on the root while the primary mouse button
+		// is down and the pointer has moved: style.css hides every row's
+		// toolbar under it, so the bar does not pop over the rows the drag
+		// crosses. Only a pointer that started on message text counts; a
+		// press on a button or a link is a click, and touch scrolls.
+		const selecting = ref(false);
+		let dragStart: {x: number; y: number} | null = null;
+
+		const onDragMove = (e: PointerEvent) => {
+			if (
+				dragStart &&
+				!selecting.value &&
+				(Math.abs(e.clientX - dragStart.x) > DRAG_SLOP_PX ||
+					Math.abs(e.clientY - dragStart.y) > DRAG_SLOP_PX)
+			) {
+				selecting.value = true;
+			}
+		};
+
+		const endDrag = () => {
+			dragStart = null;
+			selecting.value = false;
+			window.removeEventListener("pointermove", onDragMove);
+			window.removeEventListener("pointerup", endDrag);
+			window.removeEventListener("pointercancel", endDrag);
+		};
+
+		const onPointerDown = (e: PointerEvent) => {
+			if (e.pointerType !== "mouse" || e.button !== 0) {
+				return;
+			}
+
+			if ((e.target as HTMLElement | null)?.closest("a, button, .msg-actions")) {
+				return;
+			}
+
+			dragStart = {x: e.clientX, y: e.clientY};
+			window.addEventListener("pointermove", onDragMove);
+			window.addEventListener("pointerup", endDrag);
+			window.addEventListener("pointercancel", endDrag);
+		};
+
 		/**
 		 * A finger drag on the scrollback puts the keyboard away, like a native
 		 * scroll view's `keyboardDismissMode = .onDrag`. On `touchmove`, not
@@ -475,7 +546,13 @@ export default defineComponent({
 		// must not decide whether the list is still pinned.
 		let seenHeight = 0;
 
+		const touchDown = () => noteTouch(true);
+		const touchUp = () => noteTouch(false);
+
 		const handleScroll = () => {
+			// The list is moving: a page arriving now is held (scrollSettle.ts).
+			noteScroll();
+
 			// Setting scrollTop also triggers scroll event
 			// We don't want to perform calculations for that
 			if (skipNextScrollEvent.value) {
@@ -521,8 +598,12 @@ export default defineComponent({
 		});
 
 		onMounted(() => {
+			watchSelection();
 			chat.value?.addEventListener("scroll", handleScroll, {passive: true});
 			chat.value?.addEventListener("touchmove", dismissKeyboard, {passive: true});
+			chat.value?.addEventListener("touchstart", touchDown, {passive: true});
+			chat.value?.addEventListener("touchend", touchUp, {passive: true});
+			chat.value?.addEventListener("touchcancel", touchUp, {passive: true});
 
 			if (chat.value) {
 				resizeObserver.observe(chat.value);
@@ -549,6 +630,18 @@ export default defineComponent({
 				}
 			}
 		);
+
+		// Back after a drop (reconnect, then the JOIN): a button left in view
+		// while it could not be used gets its look again. At the top of the
+		// buffer there is no scroll left to bring it back into view, so
+		// without this the page the user asked for during the reconnect
+		// never comes.
+		watch(canLoadMore, (ready) => {
+			if (ready && historyObserver.value && loadMoreButton.value) {
+				historyObserver.value.unobserve(loadMoreButton.value);
+				historyObserver.value.observe(loadMoreButton.value);
+			}
+		});
 
 		watch(
 			() => props.channel.messages,
@@ -592,14 +685,21 @@ export default defineComponent({
 		onBeforeUnmount(() => {
 			resizeObserver.disconnect();
 			chat.value?.removeEventListener("scroll", handleScroll);
+			endDrag();
 		});
 
 		onUnmounted(() => {
+			unwatchSelection();
+
 			if (verifyTimer !== null) {
 				clearTimeout(verifyTimer);
 			}
 
 			chat.value?.removeEventListener("touchmove", dismissKeyboard);
+			chat.value?.removeEventListener("touchstart", touchDown);
+			chat.value?.removeEventListener("touchend", touchUp);
+			chat.value?.removeEventListener("touchcancel", touchUp);
+			noteTouch(false);
 
 			if (historyObserver.value) {
 				historyObserver.value.disconnect();
@@ -619,6 +719,9 @@ export default defineComponent({
 			isPreviousSource,
 			jumpToBottom,
 			onLinkPreviewToggle,
+			selecting,
+			selectionActive,
+			onPointerDown,
 		};
 	},
 });

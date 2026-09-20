@@ -33,9 +33,18 @@ One component, opened from either anchor, `<Teleport>`ed to `<body>` because
 the scrollback would otherwise clip it, and positioned from JS against the
 button it belongs to: below it, flipped above when there is no room, clamped
 into the viewport, re-pinned on scroll and resize, and closed once the message
-it belongs to has scrolled away. Under 480px wide it is a sheet along the
-bottom edge instead, and the search field does not take focus on a coarse
-pointer — the on-screen keyboard would cover what the user came to tap.
+it belongs to has scrolled away. Under 480px wide, or on a touch device under
+500px tall (a phone on its side), it is a sheet along the bottom edge instead,
+and the search field does not take focus on a coarse pointer — the on-screen
+keyboard would cover what the user came to tap. The sheet's bottom edge is the
+visible band `helpers/viewport.ts` publishes as `--viewport-height`, not the
+window's: iOS keeps a fixed element's `bottom: 0` under the keyboard. The
+popover measures its room from the same band (`visibleHeight()`) but keeps its
+offsets in layout-viewport terms, which is what `position: fixed` resolves. A
+landscape phone with the keyboard up keeps ~190px, so there
+(`html[data-keyboard="up"]`) the sheet takes the whole band, drops its tab
+strip and tightens its chrome for two rows of emoji. Browser check:
+`tools/scenarios/reaction-picker.mjs` (the sheet steps publish the band by hand).
 
 Its parts, top to bottom:
 
