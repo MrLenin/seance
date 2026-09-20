@@ -439,6 +439,17 @@ describe("IrcClient", function () {
 			expect(msg.self).to.equal(false);
 			expect(h.client.findChannel("#seance")!.findUser("dave")!.nick).to.equal("dave");
 		});
+
+		it("drops a realname that is only the nick again", function () {
+			const h = setup();
+			const id = joined(h);
+			h.transport.line(":dave!dave@host JOIN #seance * :Dave");
+
+			const msg = lastMessage(id);
+			expect(msg.type).to.equal(MessageType.JOIN);
+			expect(msg.gecos).to.equal(undefined);
+			expect(msg.account).to.equal(undefined);
+		});
 	});
 
 	describe("PRIVMSG / NOTICE", function () {
