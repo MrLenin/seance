@@ -11,6 +11,7 @@ import {errorSpec} from "../errors";
 import {formatLine} from "../message";
 import {failPendingLabel} from "../pending";
 import type {Handler} from "../types";
+import {reopenEndedHistory} from "../history";
 
 /** Params without our own leading nick, joined for display. */
 function textOf(params: string[]): string {
@@ -36,6 +37,24 @@ const ignore: Handler = () => undefined;
 const isupport: Handler = (client, msg) => {
 	client.isupport.apply(msg.params);
 	client.dispatch("network:options", {network: client.uuid, serverOptions: client.serverOptions});
+
+	// A widening of the network's history retention (a store linked, or
+	// keeps more) reopens scrollbacks that had ended. Compared with the
+	// value seen last on this network, across reconnects: a reconnect's
+	// first 005 alone is not a widening.
+	const retention = client.isupport.chathistoryRetention;
+	const seen = client.retentionSeen;
+
+	if (retention !== undefined) {
+		const widened =
+			seen !== undefined && (seen === 0 ? false : retention === 0 || retention > seen);
+
+		client.retentionSeen = retention;
+
+		if (widened) {
+			reopenEndedHistory(client);
+		}
+	}
 
 	const name = client.isupport.network;
 

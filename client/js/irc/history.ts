@@ -455,7 +455,31 @@ function deliverPrepend(
 	// offered; under overlapping requests the running total drifted the
 	// other way. Send the boolean; totalMessages stays for other readers.
 	const totalMessages = chan.shared.totalMessages + (moreAvailable ? 1 : 0);
+	chan.historyEnded = !moreAvailable;
 	client.dispatch("more", {chan: chan.id, messages, totalMessages, moreAvailable});
+}
+
+/**
+ * The advertised retention widened (a store linked, or one keeps more;
+ * `evilnet/CHATHISTORYRETENTION` in a fresh 005): every channel whose
+ * scrollback had ended may have older history again. Offer the button
+ * back -- a page, not a promise: the next `more` asks the server, which
+ * still answers honestly. Called by the 005 handler.
+ */
+export function reopenEndedHistory(client: IrcClient): void {
+	for (const chan of client.channels) {
+		if (!chan.historyEnded) {
+			continue;
+		}
+
+		chan.historyEnded = false;
+		client.dispatch("more", {
+			chan: chan.id,
+			messages: [],
+			totalMessages: chan.shared.totalMessages + 1,
+			moreAvailable: true,
+		});
+	}
 }
 
 /** Append catch-up messages as live ones, without unread / notification effects. */

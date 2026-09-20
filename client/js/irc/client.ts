@@ -223,6 +223,12 @@ export class IrcClient {
 	/** Swapped for a new one on an STS upgrade; always subscribed via {@link reconfigure}. */
 	transport: Transport;
 	readonly isupport = new ISupport();
+	/**
+	 * `evilnet/CHATHISTORYRETENTION` as last advertised on this network,
+	 * kept across reconnects (isupport itself resets): a fresh 005 with a
+	 * wider value reopens scrollbacks that ended (handlers/numerics.ts).
+	 */
+	retentionSeen: number | undefined = undefined;
 	/** Outstanding `TOKEN GENERATE` requests (draft/authtoken). */
 	readonly authtoken = new TokenRequests();
 	readonly channels: Channel[] = [];

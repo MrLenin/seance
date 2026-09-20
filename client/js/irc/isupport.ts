@@ -205,6 +205,19 @@ export class ISupport {
 	}
 
 	/**
+	 * `evilnet/CHATHISTORYRETENTION=<seconds>` (nefarious2 fork): how far back
+	 * history can be had, the widest over the stores the server can reach
+	 * right now. 0 means a store keeps history for good; undefined when no
+	 * store is reachable. The value follows the network: it drops when a
+	 * store leaves and rises when one links or widens, so it is a hint
+	 * about now, never a final word (history.ts reopens a scrollback that
+	 * ended when it rises).
+	 */
+	get chathistoryRetention(): number | undefined {
+		return this.getInt("evilnet/CHATHISTORYRETENTION");
+	}
+
+	/**
 	 * `EXTBAN=prefix,types`. nefarious2 spells the token `EXTBANS` on master
 	 * and `EXTBAN` on the ircv3.2-upgrade branch; both are accepted.
 	 */

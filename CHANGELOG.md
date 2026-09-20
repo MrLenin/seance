@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+- Scrollback that reached the end of what the network keeps is parked, not closed for good: the server advertises how far back history goes (`evilnet/CHATHISTORYRETENTION`, the widest over the stores it can reach), and when that widens later (a store links, or keeps more) the "show older messages" button is offered again on channels that had run out. Nothing is asked for until it is pressed.
 - File uploads go to the network's own upload host when the server advertises one (IRCv3 `draft/FILEHOST` ISUPPORT + `draft/authtoken`): a one-shot token from `TOKEN GENERATE FILEHOST`, the file as a bearer-authenticated `POST`, `Location` inserted into the input. Takes precedence over the deploy's `uploads` config for that network; the paperclip appears without any `config.json` entry. See `docs/resources/branding.md` § Uploads.
 - Scrollback on a phone: a page of older messages that arrives while the list is still moving (a fling running, a finger down) is held until the scrolling settles, then inserted in one go, instead of stopping the fling dead to put the view back.
 - Scrollback in a busy channel: the 100 messages the client keeps of a channel it is not showing are now also forgotten by the IRC layer, so the pages that bring the rest back are shown again instead of being dropped as already seen (the channel stopped scrolling back, on that channel only, until a restart).

@@ -258,6 +258,38 @@ function hist(n: number, nick = "bob", text = `message ${n}`): string {
 	return `@time=2026-08-25T11:${minute}:00.000Z;msgid=m${n} :${nick}!${nick}@host PRIVMSG #seance :${text}`;
 }
 
+/** Drop the transport and register again (the spy is reset); returns what was sent. */
+	function reconnect(
+		h: Harness,
+		isupport = "CHATHISTORY=100 MSGREFTYPES=timestamp,msgid"
+	): string[] {
+		h.transport.closed();
+		dispatch.resetHistory();
+		h.client.connect();
+		h.transport.open();
+		h.transport.line(
+			"@time=x :irc.test CAP * LS :draft/chathistory=100 labeled-response batch message-tags server-time"
+		);
+		const req = h.transport.sent.find(
+			(l, i) => i >= h.transport.sent.length - 4 && l.startsWith("CAP REQ :")
+		);
+		h.transport.line(
+			`:irc.test CAP alice ACK :${(req as string).slice("CAP REQ :".length)}`
+		);
+		h.transport.lines(
+			":irc.test 001 alice :Welcome back",
+			`:irc.test 005 alice CHANTYPES=#& PREFIX=(ov)@+ CHANMODES=b,k,l,imnpst CASEMAPPING=rfc1459 ${isupport} :are supported by this server`,
+			":irc.test 422 alice :MOTD File is missing"
+		);
+		h.sent();
+		h.transport.lines(
+			"@time=2026-08-25T12:30:00.000Z;msgid=join-2 :alice!alice@host JOIN #seance",
+			":irc.test 353 alice = #seance :@alice bob",
+			":irc.test 366 alice #seance :End of /NAMES list."
+		);
+		return h.sent();
+	}
+
 describe("Chat history (history.ts)", function () {
 	beforeEach(function () {
 		installSpy();
@@ -877,37 +909,78 @@ describe("Chat history (history.ts)", function () {
 		});
 	});
 
-	describe("catch-up after a reconnect", function () {
-		function reconnect(
-			h: Harness,
-			isupport = "CHATHISTORY=100 MSGREFTYPES=timestamp,msgid"
-		): string[] {
-			h.transport.closed();
-			dispatch.resetHistory();
-			h.client.connect();
-			h.transport.open();
+	describe("retention hint (evilnet/CHATHISTORYRETENTION)", function () {
+		const isupport = (h: Harness, seconds: number) =>
 			h.transport.line(
-				"@time=x :irc.test CAP * LS :draft/chathistory=100 labeled-response batch message-tags server-time"
+				`:irc.test 005 alice evilnet/CHATHISTORYRETENTION=${seconds} :are supported by this server`
 			);
-			const req = h.transport.sent.find(
-				(l, i) => i >= h.transport.sent.length - 4 && l.startsWith("CAP REQ :")
-			);
-			h.transport.line(
-				`:irc.test CAP alice ACK :${(req as string).slice("CAP REQ :".length)}`
-			);
-			h.transport.lines(
-				":irc.test 001 alice :Welcome back",
-				`:irc.test 005 alice CHANTYPES=#& PREFIX=(ov)@+ CHANMODES=b,k,l,imnpst CASEMAPPING=rfc1459 ${isupport} :are supported by this server`,
-				":irc.test 422 alice :MOTD File is missing"
-			);
-			h.sent();
-			h.transport.lines(
-				"@time=2026-08-25T12:30:00.000Z;msgid=join-2 :alice!alice@host JOIN #seance",
-				":irc.test 353 alice = #seance :@alice bob",
-				":irc.test 366 alice #seance :End of /NAMES list."
-			);
-			return h.sent();
+
+		function endedChannel(h: Harness, id: number): void {
+			socket.emit("more", {target: id, lastId: -1, condensed: false});
+			reply(h, h.sent(), [], undefined, true);
+			expect(mores(id)[0].moreAvailable, "the scrollback ended").to.equal(false);
 		}
+
+		it("a 005 widening the retention offers the button back on a channel whose scrollback ended", function () {
+			const h = setup();
+			const id = joined(h);
+			endedChannel(h, id);
+			isupport(h, 7 * 86400); // first value seen: not a widening
+			expect(mores(id)).to.have.length(1);
+
+			isupport(h, 14 * 86400);
+			const reopened = mores(id)[1];
+			expect(reopened.messages).to.deep.equal([]);
+			expect(reopened.moreAvailable).to.equal(true);
+			expect(h.sent(), "no request of its own: the next `more` asks").to.deep.equal([]);
+		});
+
+		it("the same value, a narrower one, or a channel that had not ended: nothing", function () {
+			const h = setup();
+			const id = joined(h);
+			isupport(h, 14 * 86400);
+			endedChannel(h, id);
+			isupport(h, 14 * 86400);
+			isupport(h, 7 * 86400);
+			expect(mores(id)).to.have.length(1);
+
+			// A channel that never ended is left alone by a widening.
+			const other = h.client.findChannel("#seance")!;
+			other.historyEnded = false;
+			isupport(h, 30 * 86400);
+			expect(mores(id)).to.have.length(1);
+		});
+
+		it("\"for good\" (0) widens anything; once for good, nothing is wider", function () {
+			const h = setup();
+			const id = joined(h);
+			isupport(h, 7 * 86400);
+			endedChannel(h, id);
+			isupport(h, 0);
+			expect(mores(id)).to.have.length(2);
+			endedChannel(h, id);
+			isupport(h, 365 * 86400);
+			expect(mores(id), "narrower than for good").to.have.length(3);
+		});
+
+		it("the value is remembered across a reconnect: a wider one after it reopens", function () {
+			const h = setup();
+			const id = joined(h);
+			isupport(h, 7 * 86400);
+			endedChannel(h, id);
+			expect(h.client.retentionSeen).to.equal(7 * 86400);
+
+			// The reconnect's own 005 carries no token here; the first one that
+			// does is wider than what this network last advertised.
+			reconnect(h);
+			expect(h.client.retentionSeen, "kept across the drop").to.equal(7 * 86400);
+			isupport(h, 14 * 86400);
+			const reopened = mores(id).find((m) => m.moreAvailable && m.messages.length === 0);
+			expect(reopened, "reopened after the reconnect").to.not.equal(undefined);
+		});
+	});
+
+	describe("catch-up after a reconnect", function () {
 
 		it("delivers a page again after the UI dropped its rows (history:trim)", function () {
 			const h = setup();

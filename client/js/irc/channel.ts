@@ -78,6 +78,13 @@ export class Channel {
 	/** A `more` page the connection died on; asked again once we are back (history.ts). */
 	lostMore: HistorySpec | undefined = undefined;
 	/**
+	 * The server answered a `more` page with "nothing older" (the end tag,
+	 * an empty page). Parked, not final: the network's retention can widen
+	 * again (a store links or is back), and history.ts then offers the
+	 * button once more.
+	 */
+	historyEnded = false;
+	/**
 	 * Read marker (`draft/read-marker`): the newest time we have sent or the
 	 * server has told us was read, on any of the account's sessions. Messages
 	 * at or before it never count as unread.
