@@ -71,6 +71,7 @@
 						v-show="link.sourceLoaded"
 						preload="metadata"
 						controls
+						playsinline
 						referrerpolicy="no-referrer"
 						@canplay="onPreviewReady"
 						@error="onPreviewError"
