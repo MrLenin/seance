@@ -247,16 +247,14 @@
 /* Own messages on a shade lighter than the chat, as in the mockup, so the
  * scrollback bands — what we said, not our own join or mode lines, which
  * carry .self as well. A highlighted row's tint still wins (higher
- * specificity in style.css). */
+ * specificity in style.css). The text is left to Settings → Appearance →
+ * Your own messages (style.css): greyed under the default, cream under
+ * "highlighted row" (where --own-bg is also the band it uses) and "same as
+ * everyone else's" (which lifts this band too). The look in the mockup —
+ * the band, the text cream — is "highlighted row". */
 #chat .msg.self[data-type="message"],
 #chat .msg.self[data-type="action"] {
 	background-color: var(--own-bg);
-}
-
-/* style.css greys own text to the muted tone, which here is lavender and
- * reads as disabled; the band is what marks the row, the text stays cream. */
-#chat .msg.self .content {
-	color: var(--chat-fg);
 }
 
 /* The composer's caret and the focus edge: rose gold with a pink glow. */
