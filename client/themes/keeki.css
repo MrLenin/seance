@@ -117,21 +117,22 @@
 	--unread-marker-color: var(--sunflower-on-page);
 }
 
-/* The rail: coffee's gradient, a diagonal rose-gold sheen over it, four
- * layers of glitter, and on top of those the flowers — each a tiled radial
- * gradient at its own period and offset, so nothing lines up into a grid.
- * A sunflower is a brown heart over eight round petals (nine layers, one
- * tile; the heart is listed first so it paints on top), a rose is a dark disc under a red ring, a brighter ring
- * and a red dot each set a little off centre so it turns like a bloom seen
- * from above (four layers). Their periods are three rows tall, so the rail
- * carries a scattering of about nine flowers, not a grid of them.
- * Both drawn, no image, so they take the palette's colours. */
+/* The rail: coffee's gradient, the flowers over it — each a tiled image at
+ * its own period and offset, so nothing lines up into a grid; their periods
+ * are three rows tall, so the rail carries a scattering of about nine
+ * flowers, not a grid of them — then a diagonal rose-gold sheen and four
+ * layers of glitter on top, so the petals sparkle like the rest of the rail.
+ *
+ * The head of the rail is kept clear: the logo, the jump box and the first
+ * network's header (its name and its four tool glyphs) are the one place a
+ * flower drifting under bold text and a bell reads as clutter rather than
+ * fabric, so a layer of the rail's own top colour sits between the flowers
+ * and the glitter for the first 10rem and fades out over the next 2.5rem.
+ * It stays put while everything else drifts. The base gradient has moved a
+ * few points by 10rem; the fade hides the step. */
 #sidebar {
 	background-color: var(--rail-bg-bottom);
 	background-image:
-		var(--sunflower),
-		var(--rose),
-		var(--sunflower-small),
 		radial-gradient(circle, var(--glitter-rose) 0 1px, transparent 1.6px),
 		radial-gradient(circle, var(--glitter-pink) 0 1px, transparent 1.6px),
 		radial-gradient(circle, var(--glitter-lavender) 0 0.8px, transparent 1.4px),
@@ -143,26 +144,32 @@
 			transparent 65%,
 			rgb(255 123 200 / 10%) 100%
 		),
+		linear-gradient(180deg, var(--rail-bg-top) 0, var(--rail-bg-top) 10rem, transparent 12.5rem),
+		var(--sunflower),
+		var(--rose),
+		var(--sunflower-small),
 		linear-gradient(180deg, var(--rail-bg-top) 0%, var(--rail-bg-bottom) 100%);
 	background-size:
-		263px 293px,
-		173px 347px,
-		197px 251px,
 		97px 113px,
 		131px 79px,
 		173px 151px,
 		61px 89px,
 		100% 100%,
+		100% 100%,
+		263px 293px,
+		173px 347px,
+		197px 251px,
 		100% 100%;
 	background-position:
-		31px 89px,
-		167px 211px,
-		191px 23px,
 		13px 7px,
 		41px 53px,
 		5px 91px,
 		29px 17px,
 		0 0,
+		0 0,
+		31px 89px,
+		167px 211px,
+		191px 23px,
 		0 0;
 }
 
@@ -178,14 +185,15 @@
 	@keyframes keeki-twinkle {
 		to {
 			background-position:
-				101px 179px,
-				247px 291px,
-				281px 103px,
 				110px 120px,
 				172px 132px,
 				178px 242px,
 				90px 106px,
 				0 0,
+				0 0,
+				101px 179px,
+				247px 291px,
+				281px 103px,
 				0 0;
 		}
 	}
