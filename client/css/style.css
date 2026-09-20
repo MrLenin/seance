@@ -2027,8 +2027,31 @@ textarea.input {
 .user.color-31 { color: #eb0400; }
 .user.color-32 { color: #e60082; }
 
+/* Your own messages (Settings → Appearance → Your own messages, applied as
+ * <html data-own-messages>, helpers/ownMessages.ts). The default is
+ * TheLounge's: the text in the muted colour. "band" keeps the text and puts
+ * the row on a band — a theme names its own with `--own-bg`, otherwise the
+ * text colour at 7% over the row — and "plain" makes an own row like anyone
+ * else's, which also lifts a band a theme paints on its own (princess). The
+ * html[data-…] prefix is what beats a theme's `#chat .msg.self`; a mention
+ * row keeps its tint. Own join/mode lines are `.self` too and are left to
+ * the theme: the band is for what we said. */
 #chat .self .content {
 	color: var(--body-color-muted);
+}
+
+html[data-own-messages="band"] #chat .self .content,
+html[data-own-messages="plain"] #chat .self .content {
+	color: inherit;
+}
+
+html[data-own-messages="band"] #chat .msg.self[data-type="message"]:not(.highlight),
+html[data-own-messages="band"] #chat .msg.self[data-type="action"]:not(.highlight) {
+	background-color: var(--own-bg, color-mix(in srgb, currentcolor 7%, transparent));
+}
+
+html[data-own-messages="plain"] #chat .msg.self:not(.highlight) {
+	background-color: transparent;
 }
 
 /* A copy of our own message the server has not echoed yet (bus-contract

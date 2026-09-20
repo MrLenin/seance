@@ -67,6 +67,7 @@
 	--rail-fg-strong: #f2f2f2; /* an unread channel */
 	--rail-fg-active: #333; /* dark on a light pill */
 	--rail-fg-muted: #999; /* a parted or idle channel */
+	--own-bg: #1e1e1e; /* the own-message band, also what the "Highlighted row" setting uses */
 	--rail-item-active-bg: #e5e5e5; /* the selected pill */
 	--rail-item-hover-bg: rgb(255 255 255 / 8%);
 	--rail-accent: #e5e5e5;
@@ -149,7 +150,7 @@
 }
 
 #chat .msg.self {
-	background-color: #1e1e1e; /* your own messages */
+	background-color: var(--own-bg); /* your own messages */
 }
 
 #chat .msg[data-type="condensed"] {
