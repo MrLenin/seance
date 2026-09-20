@@ -248,3 +248,9 @@
 .irc-bg13 { background: #f0f; }
 .irc-bg14 { background: #808080; }
 .irc-bg15 { background: silver; }
+
+/* The ✕ on the selected row sits on the blue pill, so it takes the pill's
+ * text colour: the rail's dark-blue glyph at 40% was lost on it. */
+.channel-list-item.active .close::before {
+	color: var(--rail-fg-active);
+}
